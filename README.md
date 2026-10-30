@@ -6,4 +6,4 @@ Take turns claiming numbers 1–9. First to hold **three that add up to exactly 
 - Optional hints show winning and blocking moves
 - Single static `index.html` — no build step
 
-Run locally by opening `index.html` in a browser.
+Play at https://the-15-game.vercel.app — or run locally by opening `index.html` in a browser.
