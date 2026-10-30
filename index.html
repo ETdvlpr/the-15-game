@@ -1,0 +1,733 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>The 15-Game — can you beat the AI?</title>
+<meta name="description" content="Take turns claiming numbers 1–9. First to hold three that add up to exactly 15 wins. Simple to learn, surprisingly hard to master.">
+<meta name="theme-color" content="#0e1320">
+
+<!-- Link preview (LinkedIn, X, Slack…). Replace YOUR-DOMAIN after your first Vercel deploy. -->
+<meta property="og:type" content="website">
+<meta property="og:title" content="The 15-Game — can you beat the AI?">
+<meta property="og:description" content="Take turns claiming numbers 1–9. First to hold three that add up to exactly 15 wins.">
+<meta property="og:image" content="https://YOUR-DOMAIN.vercel.app/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="627">
+<meta property="og:url" content="https://YOUR-DOMAIN.vercel.app/">
+<meta name="twitter:card" content="summary_large_image">
+
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23f6efe2'/%3E%3Ctext x='32' y='43' font-family='Georgia,serif' font-size='30' font-weight='700' text-anchor='middle' fill='%230e1320'%3E15%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,800&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+
+<style>
+  :root {
+    --bg: #0e1320;
+    --bg-2: #151c2e;
+    --panel: rgba(255,255,255,.035);
+    --line: rgba(255,255,255,.09);
+    --text: #eef1f7;
+    --muted: #8b94ab;
+    --card: #f6efe2;
+    --card-2: #ece2cf;
+    --ink: #1a2032;
+    --you: #2fd4a7;
+    --you-soft: rgba(47,212,167,.16);
+    --ai: #ff7a5c;
+    --ai-soft: rgba(255,122,92,.16);
+    --gold: #ffcf5c;
+    --radius: 16px;
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    min-height: 100dvh;
+    background:
+      radial-gradient(1200px 600px at 50% -10%, #1d2a4a 0%, transparent 60%),
+      radial-gradient(800px 500px at 50% 120%, #1a1730 0%, transparent 60%),
+      var(--bg);
+    color: var(--text);
+    font-family: "Space Grotesk", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -webkit-tap-highlight-color: transparent;
+  }
+  button { font: inherit; color: inherit; }
+
+  .app {
+    max-width: 440px;
+    margin: 0 auto;
+    padding: max(14px, env(safe-area-inset-top)) 16px max(20px, env(safe-area-inset-bottom));
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    min-height: 100dvh;
+  }
+
+  /* ---------- Header ---------- */
+  .top { display: flex; align-items: center; justify-content: space-between; }
+  .brand { display: flex; align-items: center; gap: 10px; }
+  .logo {
+    width: 38px; height: 38px; border-radius: 10px;
+    display: grid; place-items: center;
+    background: var(--card); color: var(--ink);
+    font: 800 17px "Fraunces", serif;
+    transform: rotate(-6deg);
+    box-shadow: 0 4px 0 var(--card-2), 0 8px 18px rgba(0,0,0,.35);
+  }
+  .brand h1 { margin: 0; font: 800 24px "Fraunces", serif; letter-spacing: -.01em; }
+  .top-actions { display: flex; gap: 8px; align-items: center; }
+  .streak {
+    font-size: 13px; font-weight: 700; color: var(--gold);
+    padding: 6px 10px; border-radius: 999px;
+    background: rgba(255,207,92,.1); border: 1px solid rgba(255,207,92,.25);
+  }
+  .streak[hidden] { display: none; }
+  .icon-btn {
+    width: 36px; height: 36px; border-radius: 50%;
+    border: 1px solid var(--line); background: var(--panel);
+    font-weight: 700; cursor: pointer;
+  }
+  .icon-btn:hover { background: rgba(255,255,255,.08); }
+
+  .tagline { margin: -4px 0 0; color: var(--muted); font-size: 14px; line-height: 1.4; }
+  .tagline b { color: var(--text); font-weight: 500; }
+
+  /* ---------- Player panels ---------- */
+  .player {
+    --c: var(--you); --c-soft: var(--you-soft);
+    border: 1px solid var(--line);
+    background: var(--panel);
+    border-radius: var(--radius);
+    padding: 10px 12px;
+    transition: border-color .25s, box-shadow .25s;
+  }
+  .player.p1 { --c: var(--ai); --c-soft: var(--ai-soft); }
+  .player.active { border-color: var(--c); box-shadow: 0 0 0 3px var(--c-soft); }
+  .who { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .avatar {
+    width: 30px; height: 30px; border-radius: 50%;
+    display: grid; place-items: center;
+    background: var(--c-soft); color: var(--c);
+    font-size: 12px; font-weight: 700;
+  }
+  .name { font-weight: 700; font-size: 15px; }
+  .sub { color: var(--muted); font-size: 12px; }
+  .needs { margin-left: auto; font-size: 12px; font-weight: 700; color: var(--c); }
+
+  .hand { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; max-width: 300px; }
+  .slot {
+    aspect-ratio: 1 / 1;
+    border-radius: 10px;
+    border: 1.5px dashed var(--line);
+  }
+  .mini {
+    width: 100%; height: 100%;
+    border-radius: 10px;
+    display: grid; place-items: center;
+    background: linear-gradient(160deg, var(--card), var(--card-2));
+    color: var(--ink);
+    font: 800 clamp(20px, 6vw, 26px) "Fraunces", serif;
+    box-shadow: inset 0 -4px 0 var(--c), 0 4px 10px rgba(0,0,0,.25);
+    animation: pop .35s cubic-bezier(.2,1.6,.4,1);
+  }
+  .slot.has { border-color: transparent; }
+  .hand.won .mini { opacity: .35; filter: grayscale(.6); }
+  .hand.won .mini.trio {
+    opacity: 1; filter: none;
+    box-shadow: inset 0 -4px 0 var(--c), 0 0 0 3px var(--gold), 0 0 24px rgba(255,207,92,.55);
+    animation: bounce .6s ease both;
+  }
+  .hand.won .slot:nth-child(2) .trio { animation-delay: .08s; }
+  .hand.won .slot:nth-child(3) .trio { animation-delay: .16s; }
+  .hand.won .slot:nth-child(4) .trio { animation-delay: .24s; }
+  .hand.won .slot:nth-child(5) .trio { animation-delay: .32s; }
+
+  /* ---------- Status ---------- */
+  .status {
+    text-align: center;
+    font-size: 15px; font-weight: 500;
+    min-height: 22px;
+  }
+  .status .hl-you { color: var(--you); font-weight: 700; }
+  .status .hl-ai { color: var(--ai); font-weight: 700; }
+  .dots::after { content: ""; animation: dots 1.2s steps(4) infinite; }
+
+  /* ---------- Deck ---------- */
+  .deck {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    width: 100%;
+    max-width: 300px;
+    margin: 0 auto;
+  }
+  .card {
+    position: relative;
+    aspect-ratio: 1 / 1;
+    border: 0;
+    border-radius: 14px;
+    background: linear-gradient(160deg, var(--card), var(--card-2));
+    color: var(--ink);
+    cursor: pointer;
+    box-shadow: 0 5px 0 #cbbd9f, 0 10px 20px rgba(0,0,0,.35);
+    transition: transform .15s ease, box-shadow .15s ease, opacity .2s;
+    display: grid; place-items: center;
+  }
+  .card .num { font: 800 clamp(34px, 11vw, 46px) "Fraunces", serif; line-height: 1; }
+  .card .corner {
+    position: absolute; top: 7px; left: 9px;
+    font: 600 12px "Fraunces", serif; opacity: .45;
+  }
+  .card .corner.br { top: auto; left: auto; bottom: 7px; right: 9px; }
+  .card:hover:not(:disabled) { transform: translateY(-3px); box-shadow: 0 8px 0 #cbbd9f, 0 16px 26px rgba(0,0,0,.4); }
+  .card:active:not(:disabled) { transform: translateY(3px); box-shadow: 0 2px 0 #cbbd9f, 0 4px 10px rgba(0,0,0,.3); }
+  .card:focus-visible { outline: 3px solid var(--gold); outline-offset: 3px; }
+  .card:disabled { cursor: default; }
+  .deck.waiting .card:not(.taken) { opacity: .7; }
+
+  .card.taken {
+    background: transparent;
+    box-shadow: none;
+    border: 2px dashed currentColor;
+    animation: take .3s ease;
+  }
+  .card.taken.by0 { color: rgba(47,212,167,.4); }
+  .card.taken.by1 { color: rgba(255,122,92,.4); }
+  .card.taken .corner { display: none; }
+
+  .tag {
+    position: absolute; top: -8px; right: -6px;
+    font-size: 10px; font-weight: 700; letter-spacing: .06em;
+    padding: 3px 7px; border-radius: 999px;
+    color: var(--bg);
+  }
+  .card.hint-win { box-shadow: 0 5px 0 #cbbd9f, 0 0 0 3px var(--you), 0 10px 24px rgba(47,212,167,.35); }
+  .card.hint-win .tag { background: var(--you); }
+  .card.hint-block { box-shadow: 0 5px 0 #cbbd9f, 0 0 0 3px var(--ai), 0 10px 24px rgba(255,122,92,.3); }
+  .card.hint-block .tag { background: var(--ai); }
+
+  /* ---------- Controls ---------- */
+  .controls {
+    margin-top: auto;
+    display: grid; gap: 10px;
+    border-top: 1px solid var(--line);
+    padding-top: 14px;
+  }
+  .row { display: flex; gap: 10px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+  .seg {
+    display: inline-flex; padding: 3px; gap: 2px;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 999px;
+  }
+  .seg button {
+    border: 0; background: transparent; cursor: pointer;
+    padding: 7px 12px; border-radius: 999px;
+    font-size: 13px; font-weight: 500; color: var(--muted);
+  }
+  .seg button[aria-pressed="true"] { background: var(--text); color: var(--bg); font-weight: 700; }
+  .seg[hidden] { display: none; }
+  .switch { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px; color: var(--muted); user-select: none; }
+  .switch input { appearance: none; width: 36px; height: 20px; border-radius: 999px; background: var(--line); position: relative; cursor: pointer; transition: background .2s; margin: 0; }
+  .switch input::after { content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: var(--text); transition: transform .2s; }
+  .switch input:checked { background: var(--you); }
+  .switch input:checked::after { transform: translateX(16px); }
+  .switch input:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+
+  .btn {
+    border: 0; cursor: pointer;
+    padding: 12px 18px; border-radius: 12px;
+    font-weight: 700; font-size: 15px;
+    transition: transform .1s, filter .2s;
+  }
+  .btn:active { transform: scale(.97); }
+  .btn.primary { background: var(--gold); color: var(--ink); box-shadow: 0 4px 0 #c99a2e; }
+  .btn.ghost { background: var(--panel); border: 1px solid var(--line); }
+  .btn.small { padding: 8px 14px; font-size: 13px; }
+
+  /* ---------- Sheets ---------- */
+  .backdrop {
+    position: fixed; inset: 0; z-index: 20;
+    background: rgba(5,8,15,.6);
+    backdrop-filter: blur(4px);
+    display: flex; align-items: flex-end; justify-content: center;
+    padding: 16px;
+  }
+  .backdrop[hidden] { display: none; }
+  .sheet {
+    width: 100%; max-width: 420px;
+    background: var(--bg-2); border: 1px solid var(--line);
+    border-radius: 22px;
+    padding: 24px 20px 20px;
+    text-align: center;
+    animation: rise .35s cubic-bezier(.2,1.2,.4,1);
+    box-shadow: 0 -10px 40px rgba(0,0,0,.4);
+  }
+  .sheet h2 { margin: 6px 0 4px; font: 800 30px "Fraunces", serif; }
+  .sheet p { margin: 0; color: var(--muted); line-height: 1.5; }
+  .big-emoji { font-size: 44px; line-height: 1; }
+  .eq { display: flex; justify-content: center; align-items: center; gap: 6px; margin: 16px 0 4px; font-weight: 700; color: var(--muted); }
+  .eq .chip {
+    width: 36px; height: 44px; border-radius: 8px;
+    display: grid; place-items: center;
+    background: var(--card); color: var(--ink);
+    font: 800 20px "Fraunces", serif;
+  }
+  .eq .total { background: var(--gold); }
+  .stats { display: flex; justify-content: center; gap: 22px; margin: 18px 0 20px; }
+  .stat b { display: block; font: 800 22px "Fraunces", serif; color: var(--text); }
+  .stat span { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
+  .sheet-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+  .rules { text-align: left; margin: 14px 0 18px; padding: 0; list-style: none; display: grid; gap: 10px; }
+  .rules li { display: flex; gap: 10px; color: var(--text); line-height: 1.45; font-size: 15px; }
+  .rules li span:first-child { color: var(--gold); font-weight: 700; }
+  .examples { display: grid; gap: 6px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px; margin-bottom: 18px; font-size: 14px; text-align: left; }
+  .ok { color: var(--you); font-weight: 700; }
+  .no { color: var(--ai); font-weight: 700; }
+
+  .toast {
+    position: fixed; left: 50%; bottom: 28px; z-index: 30;
+    transform: translate(-50%, 20px); opacity: 0;
+    background: var(--text); color: var(--bg);
+    padding: 10px 16px; border-radius: 999px; font-weight: 700; font-size: 14px;
+    transition: opacity .2s, transform .2s; pointer-events: none;
+  }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+  .confetti { position: fixed; top: -12px; width: 8px; height: 12px; z-index: 25; pointer-events: none; animation: fall linear forwards; }
+
+  @keyframes pop { from { transform: scale(.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+  @keyframes take { from { transform: scale(1.06); } to { transform: scale(1); } }
+  @keyframes bounce { 0%,100% { transform: translateY(0); } 40% { transform: translateY(-10px); } 70% { transform: translateY(2px); } }
+  @keyframes rise { from { transform: translateY(40px); opacity: 0; } to { transform: none; opacity: 1; } }
+  @keyframes dots { 0% { content: ""; } 25% { content: "."; } 50% { content: ".."; } 75% { content: "..."; } }
+  @keyframes fall { to { transform: translateY(105vh) rotate(720deg); } }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+  }
+  @media (min-height: 820px) { .app { gap: 18px; padding-top: 28px; } }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div class="brand">
+      <div class="logo" aria-hidden="true">15</div>
+      <h1>The 15-Game</h1>
+    </div>
+    <div class="top-actions">
+      <span class="streak" id="streak" hidden></span>
+      <button class="icon-btn" id="helpBtn" aria-label="How to play">?</button>
+    </div>
+  </header>
+  <p class="tagline">Take turns claiming numbers. First to hold <b>three that add up to 15</b> wins.</p>
+
+  <section class="player p1" id="panel1">
+    <div class="who">
+      <div class="avatar" id="avatar1">AI</div>
+      <div>
+        <div class="name" id="name1">AI</div>
+        <div class="sub" id="sub1"></div>
+      </div>
+      <div class="needs" id="needs1"></div>
+    </div>
+    <div class="hand" id="hand1"></div>
+  </section>
+
+  <div class="status" id="status" aria-live="polite"></div>
+
+  <div class="deck" id="deck"></div>
+
+  <section class="player p0" id="panel0">
+    <div class="who">
+      <div class="avatar" id="avatar0">You</div>
+      <div>
+        <div class="name" id="name0">You</div>
+        <div class="sub" id="sub0"></div>
+      </div>
+      <div class="needs" id="needs0"></div>
+    </div>
+    <div class="hand" id="hand0"></div>
+  </section>
+
+  <div class="controls">
+    <div class="row">
+      <div class="seg" id="modeSeg">
+        <button data-mode="ai" aria-pressed="true">vs AI</button>
+        <button data-mode="local" aria-pressed="false">2 Players</button>
+      </div>
+      <label class="switch"><input type="checkbox" id="hints"> Hints</label>
+    </div>
+    <div class="row">
+      <div class="seg" id="diffSeg">
+        <button data-diff="easy" aria-pressed="false">Easy</button>
+        <button data-diff="medium" aria-pressed="true">Medium</button>
+        <button data-diff="hard" aria-pressed="false">Hard</button>
+      </div>
+      <button class="btn ghost small" id="newBtn">New game</button>
+    </div>
+  </div>
+</div>
+
+<div class="backdrop" id="resultSheet" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="resTitle">
+    <div class="big-emoji" id="resEmoji"></div>
+    <h2 id="resTitle"></h2>
+    <p id="resText"></p>
+    <div class="eq" id="resEq"></div>
+    <div class="stats" id="resStats"></div>
+    <div class="sheet-actions">
+      <button class="btn ghost" id="shareBtn">Share result</button>
+      <button class="btn primary" id="againBtn">Play again</button>
+    </div>
+  </div>
+</div>
+
+<div class="backdrop" id="helpSheet" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
+    <h2 id="helpTitle">How to play</h2>
+    <ul class="rules">
+      <li><span>1</span><span>Nine cards, numbered 1 to 9. Take turns claiming one.</span></li>
+      <li><span>2</span><span>Win by holding <b>any three</b> of your cards that add up to exactly 15.</span></li>
+      <li><span>3</span><span>Watch what your opponent needs — and take it first.</span></li>
+    </ul>
+    <div class="examples">
+      <div><span class="ok">✓</span> 4 + 5 + 6 = 15</div>
+      <div><span class="ok">✓</span> holding 1, 3, 7, 5 → 3 + 7 + 5 = 15</div>
+      <div><span class="no">✗</span> 9 + 6 = 15 — only two cards</div>
+    </div>
+    <button class="btn primary" id="helpClose" style="width:100%">Let's play</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  // ---------- Game logic ----------
+  const LINES = [[1,5,9],[1,6,8],[2,4,9],[2,5,8],[2,6,7],[3,4,8],[3,5,7],[4,5,6]];
+  const bit = n => 1 << n;
+  const toMask = arr => arr.reduce((m, n) => m | bit(n), 0);
+  const LINE_MASKS = LINES.map(toMask);
+  const FULL = toMask([1,2,3,4,5,6,7,8,9]);
+  const hasLine = m => LINE_MASKS.some(l => (m & l) === l);
+  const popcount = m => { let c = 0; while (m) { m &= m - 1; c++; } return c; };
+  const rnd = a => a[Math.floor(Math.random() * a.length)];
+
+  // Negamax over bitmasks. Positive = good for the player to move; faster wins score higher.
+  const memo = new Map();
+  function negamax(me, opp) {
+    const key = me * 1024 + opp;
+    if (memo.has(key)) return memo.get(key);
+    const used = me | opp;
+    let best = used === FULL ? 0 : -Infinity;
+    for (let n = 1; n <= 9; n++) {
+      if (used & bit(n)) continue;
+      const m = me | bit(n);
+      const v = hasLine(m) ? 100 - popcount(m | opp) : -negamax(opp, m);
+      if (v > best) best = v;
+    }
+    memo.set(key, best);
+    return best;
+  }
+
+  const findLine = hand => LINES.find(l => l.every(n => hand.includes(n)));
+  const winningCards = (hand, avail) => avail.filter(n => hasLine(toMask(hand) | bit(n)));
+
+  function bestMove(me, opp, avail) {
+    const mm = toMask(me), om = toMask(opp);
+    const scored = avail.map(n => {
+      const m = mm | bit(n);
+      return { n, v: hasLine(m) ? 100 - popcount(m | om) : -negamax(om, m) };
+    });
+    const top = Math.max(...scored.map(s => s.v));
+    return rnd(scored.filter(s => s.v === top).map(s => s.n));
+  }
+
+  function aiChoose() {
+    const me = state.hands[1], opp = state.hands[0], avail = available();
+    const wins = winningCards(me, avail), threats = winningCards(opp, avail);
+    if (state.diff === "hard") return bestMove(me, opp, avail);
+    if (state.diff === "medium") {
+      if (wins.length) return rnd(wins);
+      if (threats.length && Math.random() < .9) return rnd(threats);
+      return Math.random() < .5 ? bestMove(me, opp, avail) : rnd(avail);
+    }
+    if (wins.length && Math.random() < .6) return rnd(wins);
+    if (threats.length && Math.random() < .35) return rnd(threats);
+    return rnd(avail);
+  }
+
+  // ---------- State ----------
+  const DIFF = {
+    easy:   { label: "Easy",   persona: "Casual · makes mistakes" },
+    medium: { label: "Medium", persona: "Sharp · blocks your threats" },
+    hard:   { label: "Hard",   persona: "Unbeatable · try for a draw" },
+  };
+  const state = {
+    hands: [[], []], turn: 0, nextStarter: 0, over: false, thinking: false,
+    mode: "ai", diff: "medium", hints: false, winner: null, line: null, timer: null,
+  };
+  const available = () => [1,2,3,4,5,6,7,8,9].filter(n => !state.hands[0].includes(n) && !state.hands[1].includes(n));
+  const owner = n => state.hands[0].includes(n) ? 0 : state.hands[1].includes(n) ? 1 : null;
+  const names = () => state.mode === "ai" ? ["You", "AI"] : ["Player 1", "Player 2"];
+
+  // ---------- Stats (per-viewer convenience only) ----------
+  function loadStats() {
+    try { return JSON.parse(localStorage.getItem("pick15-stats")) || {}; } catch { return {}; }
+  }
+  function saveStats(s) {
+    try { localStorage.setItem("pick15-stats", JSON.stringify(s)); } catch {}
+  }
+  let stats = loadStats();
+  function record(result) {
+    const d = stats[state.diff] || { w: 0, d: 0, l: 0 };
+    d[result]++;
+    stats[state.diff] = d;
+    stats.streak = result === "w" ? (stats.streak || 0) + 1 : result === "d" ? (stats.streak || 0) : 0;
+    saveStats(stats);
+  }
+
+  // ---------- DOM ----------
+  const $ = id => document.getElementById(id);
+  const deckEl = $("deck");
+  const cards = {};
+  for (let n = 1; n <= 9; n++) {
+    const b = document.createElement("button");
+    b.className = "card";
+    b.innerHTML = `<span class="corner">${n}</span><span class="num">${n}</span><span class="corner br">${n}</span><span class="tag"></span>`;
+    b.addEventListener("click", () => humanPick(n));
+    deckEl.appendChild(b);
+    cards[n] = b;
+  }
+  for (const p of [0, 1]) {
+    const hand = $("hand" + p);
+    for (let i = 0; i < 5; i++) hand.appendChild(Object.assign(document.createElement("div"), { className: "slot" }));
+  }
+
+  function render() {
+    const avail = available();
+    const [n0, n1] = names();
+    const waiting = state.over || state.thinking || (state.mode === "ai" && state.turn === 1);
+
+    // Players
+    $("name0").textContent = n0; $("name1").textContent = n1;
+    $("avatar0").textContent = state.mode === "ai" ? "You" : "P1";
+    $("avatar1").textContent = state.mode === "ai" ? "AI" : "P2";
+    $("sub1").textContent = state.mode === "ai" ? DIFF[state.diff].persona : "";
+    $("sub0").textContent = "";
+    for (const p of [0, 1]) {
+      $("panel" + p).classList.toggle("active", !state.over && state.turn === p);
+      const hand = $("hand" + p);
+      hand.classList.toggle("won", state.winner === p);
+      [...hand.children].forEach((slot, i) => {
+        const n = state.hands[p][i];
+        if (n === undefined) { slot.innerHTML = ""; slot.classList.remove("has"); delete slot.dataset.n; return; }
+        if (slot.dataset.n != n) {
+          slot.dataset.n = n;
+          slot.classList.add("has");
+          slot.innerHTML = `<div class="mini">${n}</div>`;
+        }
+        slot.firstChild.classList.toggle("trio", !!(state.line && state.winner === p && state.line.includes(n)));
+      });
+      const needs = state.hints && !state.over ? winningCards(state.hands[p], avail) : [];
+      $("needs" + p).textContent = needs.length ? `needs ${needs.join(" or ")}` : "";
+    }
+
+    // Deck
+    const me = state.turn, opp = 1 - state.turn;
+    const myWins = state.hints && !waiting ? winningCards(state.hands[me], avail) : [];
+    const blocks = state.hints && !waiting ? winningCards(state.hands[opp], avail) : [];
+    deckEl.classList.toggle("waiting", waiting);
+    for (let n = 1; n <= 9; n++) {
+      const c = cards[n], o = owner(n);
+      c.classList.toggle("taken", o !== null);
+      c.classList.toggle("by0", o === 0);
+      c.classList.toggle("by1", o === 1);
+      c.classList.toggle("hint-win", myWins.includes(n));
+      c.classList.toggle("hint-block", !myWins.includes(n) && blocks.includes(n));
+      c.querySelector(".tag").textContent = myWins.includes(n) ? "WIN" : blocks.includes(n) ? "BLOCK" : "";
+      c.disabled = o !== null || waiting;
+      c.setAttribute("aria-label", o === null ? `Take ${n}` : `${n}, taken by ${names()[o]}`);
+    }
+
+    // Status
+    const s = $("status");
+    const cls = p => (p === 0 ? "hl-you" : "hl-ai");
+    if (state.over) {
+      s.innerHTML = state.winner === null ? "It's a draw" : `<span class="${cls(state.winner)}">${state.winner === 0 && state.mode === "ai" ? "You win!" : names()[state.winner] + " wins"}</span>`;
+    } else if (state.thinking) {
+      s.innerHTML = `<span class="hl-ai dots">AI is thinking</span>`;
+    } else if (state.mode === "ai") {
+      s.innerHTML = state.hands[0].length + state.hands[1].length === 0 ? `<span class="hl-you">You go first</span> — pick a card` : `<span class="hl-you">Your turn</span> — pick a card`;
+    } else {
+      s.innerHTML = `<span class="${cls(state.turn)}">${names()[state.turn]}</span> — your turn`;
+    }
+
+    // Header + controls
+    const streak = stats.streak || 0;
+    $("streak").hidden = streak < 2;
+    $("streak").textContent = `🔥 ${streak}`;
+    $("diffSeg").hidden = state.mode !== "ai";
+    document.querySelectorAll("#diffSeg button").forEach(b => b.setAttribute("aria-pressed", b.dataset.diff === state.diff));
+    document.querySelectorAll("#modeSeg button").forEach(b => b.setAttribute("aria-pressed", b.dataset.mode === state.mode));
+  }
+
+  // ---------- Flow ----------
+  function newGame() {
+    clearTimeout(state.timer);
+    Object.assign(state, { hands: [[], []], over: false, thinking: false, winner: null, line: null });
+    state.turn = state.nextStarter;
+    state.nextStarter = 1 - state.turn;
+    $("resultSheet").hidden = true;
+    render();
+    if (state.mode === "ai" && state.turn === 1) aiTurn(true);
+  }
+
+  function humanPick(n) {
+    if (state.over || state.thinking || owner(n) !== null) return;
+    if (state.mode === "ai" && state.turn !== 0) return;
+    play(n);
+  }
+
+  function play(n) {
+    const p = state.turn;
+    state.hands[p].push(n);
+    const line = findLine(state.hands[p]);
+    if (line) return finish(p, line);
+    if (!available().length) return finish(null, null);
+    state.turn = 1 - p;
+    render();
+    if (state.mode === "ai" && state.turn === 1) aiTurn();
+  }
+
+  function aiTurn(first) {
+    state.thinking = true;
+    render();
+    if (first) $("status").innerHTML = `<span class="hl-ai dots">AI goes first</span>`;
+    state.timer = setTimeout(() => {
+      state.thinking = false;
+      play(aiChoose());
+    }, 550 + Math.random() * 450);
+  }
+
+  function finish(winner, line) {
+    Object.assign(state, { over: true, winner, line, thinking: false });
+    if (state.mode === "ai") record(winner === 0 ? "w" : winner === 1 ? "l" : "d");
+    render();
+    if (winner === 0 || (state.mode === "local" && winner !== null)) confetti();
+    state.timer = setTimeout(showResult, line ? 1100 : 600);
+  }
+
+  // ---------- Result + sharing ----------
+  function showResult() {
+    const { winner, line, mode, diff } = state;
+    const ai = mode === "ai";
+    let emoji, title, text;
+    if (winner === null) {
+      emoji = "🤝"; title = "Draw";
+      text = ai && diff === "hard" ? "You held the unbeatable AI. That's the best anyone can do." : "Every card gone, no 15. Evenly matched.";
+    } else if (ai && winner === 0) {
+      emoji = "🏆"; title = "You win!";
+      text = `Beat the ${DIFF[diff].label} AI in ${state.hands[0].length} picks.`;
+    } else if (ai) {
+      emoji = "🤖"; title = "AI wins";
+      text = diff === "easy" ? "Even the casual AI got you. Rematch?" : "Watch for forks — two threats at once.";
+    } else {
+      emoji = "🏆"; title = `${names()[winner]} wins!`;
+      text = `Won in ${state.hands[winner].length} picks.`;
+    }
+    $("resEmoji").textContent = emoji;
+    $("resTitle").textContent = title;
+    $("resText").textContent = text;
+    $("resEq").innerHTML = line
+      ? line.map(n => `<span class="chip">${n}</span>`).join("<span>+</span>") + `<span>=</span><span class="chip total">15</span>`
+      : "";
+    const d = stats[diff] || { w: 0, d: 0, l: 0 };
+    $("resStats").innerHTML = ai
+      ? `<div class="stat"><b>${d.w}</b><span>Won</span></div><div class="stat"><b>${d.d}</b><span>Drawn</span></div><div class="stat"><b>${d.l}</b><span>Lost</span></div><div class="stat"><b>${stats.streak || 0}</b><span>Streak</span></div>`
+      : "";
+    $("resStats").hidden = !ai;
+    $("resultSheet").hidden = false;
+    $("againBtn").focus();
+  }
+
+  function shareText() {
+    const url = location.href.split("#")[0];
+    const { winner, line, mode, diff } = state;
+    const eq = line ? `${line.join(" + ")} = 15` : "";
+    if (mode !== "ai") return `Just played The 15-Game — ${names()[winner] ?? "nobody"} ${winner === null ? "won. Draw!" : "won with " + eq}\n${url}`;
+    if (winner === 0) return `🏆 I beat the ${DIFF[diff].label} AI at The 15-Game in ${state.hands[0].length} picks\n${eq}\nCan you? ${url}`;
+    if (winner === null) return diff === "hard"
+      ? `🤝 I held the unbeatable AI to a draw at The 15-Game\nCan you? ${url}`
+      : `🤝 Drew the ${DIFF[diff].label} AI at The 15-Game\nYour turn: ${url}`;
+    return `🤖 The ${DIFF[diff].label} AI beat me at The 15-Game\nThink you can do better? ${url}`;
+  }
+
+  async function share() {
+    const text = shareText();
+    try {
+      if (navigator.share) { await navigator.share({ text }); return; }
+      await navigator.clipboard.writeText(text);
+      toast("Copied — paste it anywhere");
+    } catch (e) {
+      if (e && e.name === "AbortError") return;
+      toast("Couldn't share — try copying the URL");
+    }
+  }
+
+  function toast(msg) {
+    const t = $("toast");
+    t.textContent = msg;
+    t.classList.add("show");
+    clearTimeout(t._h);
+    t._h = setTimeout(() => t.classList.remove("show"), 2000);
+  }
+
+  function confetti() {
+    if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const colors = ["#ffcf5c", "#2fd4a7", "#ff7a5c", "#f6efe2", "#7aa2ff"];
+    for (let i = 0; i < 70; i++) {
+      const el = document.createElement("div");
+      el.className = "confetti";
+      el.style.left = Math.random() * 100 + "vw";
+      el.style.background = rnd(colors);
+      el.style.animationDuration = 1.6 + Math.random() * 1.4 + "s";
+      el.style.animationDelay = Math.random() * .3 + "s";
+      el.style.borderRadius = Math.random() < .5 ? "50%" : "2px";
+      document.body.appendChild(el);
+      setTimeout(() => el.remove(), 3500);
+    }
+  }
+
+  // ---------- Wiring ----------
+  $("newBtn").onclick = newGame;
+  $("againBtn").onclick = newGame;
+  $("shareBtn").onclick = share;
+  $("hints").onchange = e => { state.hints = e.target.checked; render(); };
+  document.querySelectorAll("#diffSeg button").forEach(b => b.onclick = () => {
+    state.diff = b.dataset.diff; state.nextStarter = 0; newGame();
+  });
+  document.querySelectorAll("#modeSeg button").forEach(b => b.onclick = () => {
+    state.mode = b.dataset.mode; state.nextStarter = 0; newGame();
+  });
+  $("helpBtn").onclick = () => { $("helpSheet").hidden = false; $("helpClose").focus(); };
+  $("helpClose").onclick = () => { $("helpSheet").hidden = true; };
+  for (const id of ["helpSheet", "resultSheet"]) {
+    $(id).addEventListener("click", e => { if (e.target.id === id) $(id).hidden = true; });
+  }
+  document.addEventListener("keydown", e => {
+    if (e.key === "Escape") { $("helpSheet").hidden = true; $("resultSheet").hidden = true; return; }
+    if (/^[1-9]$/.test(e.key) && $("helpSheet").hidden && $("resultSheet").hidden) humanPick(+e.key);
+  });
+
+  // First visit: show the rules once.
+  try { if (!localStorage.getItem("pick15-seen")) { $("helpSheet").hidden = false; localStorage.setItem("pick15-seen", "1"); } } catch {}
+
+  newGame();
+</script>
+</body>
+</html>
