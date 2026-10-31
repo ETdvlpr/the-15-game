@@ -1,4 +1,5 @@
 import "./styles.css";
+import { inject } from "@vercel/analytics";
 import { app, localEvents, newGame, pickLocal, setDifficulty, setMode, type LocalGame, type Mode } from "./local";
 import {
   challengeFriend, checkFlag, declineInvite, join, leave, match, matchEvents, move, openGame,
@@ -18,6 +19,8 @@ import { emojiGrid, renderShareImage } from "./ui/shareImage";
 import { isMuted, setMuted, sfx, unlockAudio } from "./ui/sound";
 import { enablePush, isIOS, isStandalone } from "./online/push";
 import type { Difficulty } from "./game/logic";
+
+inject();
 
 // ---------- Rendering: everything is derived from the stores ----------
 let queued = false;

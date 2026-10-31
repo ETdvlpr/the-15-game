@@ -10,6 +10,7 @@
     "rules": "python3 scripts/gen-rules.py"
   },
   "dependencies": {
+    "@vercel/analytics": "^2.0.1",
     "firebase": "12.19.0",
     "web-push": "^3.6.7"
   },
