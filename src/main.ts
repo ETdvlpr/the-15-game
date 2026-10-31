@@ -14,6 +14,7 @@ import {
   resultAction, savedName, saveName,
 } from "./ui/sheets";
 import { $, confetti, copy, share, shake, toast } from "./ui/dom";
+import { emojiGrid, renderShareImage } from "./ui/shareImage";
 import { isMuted, setMuted, sfx, unlockAudio } from "./ui/sound";
 import type { Difficulty } from "./game/logic";
 
@@ -39,7 +40,12 @@ const showResultAfter = (ms: number) => {
   clearTimeout(resultTimer);
   resultTimer = window.setTimeout(() => app.set({ sheet: "result" }), ms);
 };
-const endSound = (winner: 0 | 1 | null, iWin: boolean) => (winner === null ? sfx.draw : iWin ? sfx.win : sfx.lose)();
+/** Haptics on phones that support them (Android); follows the mute switch. */
+const buzz = (pattern: number | number[]) => { if (!isMuted()) navigator.vibrate?.(pattern); };
+const endSound = (winner: 0 | 1 | null, iWin: boolean) => {
+  (winner === null ? sfx.draw : iWin ? sfx.win : sfx.lose)();
+  if (iWin) buzz([40, 60, 40]);
+};
 
 localEvents.addEventListener("over", e => {
   const g = (e as CustomEvent<LocalGame>).detail, { mode } = app.get();
@@ -50,8 +56,10 @@ localEvents.addEventListener("over", e => {
 });
 
 match.subscribe((m, prev) => {
-  if (app.get().mode !== "online" || m.phase === prev.phase) return;
-  onPhase(m, prev);
+  if (app.get().mode !== "online") return;
+  if (m.phase !== prev.phase) onPhase(m, prev);
+  const myTurnNow = m.phase === "playing" && m.seat !== null && m.game?.turn === m.seat;
+  if (myTurnNow && prev.game?.turn !== m.game?.turn) buzz(25);
 });
 
 function onPhase(m: MatchState, prev: MatchState) {
@@ -113,7 +121,7 @@ setInterval(() => {
     el.textContent = fmtClock(ms);
     el.classList.toggle("low", low);
     const sec = Math.ceil(ms / 1000);
-    if (low && panel === 0 && sh.seat !== null && ms > 0 && sec !== lastTickSec) { lastTickSec = sec; sfx.tick(); }
+    if (low && panel === 0 && sh.seat !== null && ms > 0 && sec !== lastTickSec) { lastTickSec = sec; sfx.tick(); buzz(12); }
   });
   const left = countdownLeft(g, now);
   cd.hidden = left <= 0;
@@ -130,31 +138,55 @@ setInterval(() => {
 }, 100);
 
 // ---------- Sharing ----------
-function shareText(): string {
-  const { mode, diff, game } = app.get();
-  const home = location.origin + location.pathname;
-  const { winner, line } = boardView();
-  const eq = line ? `${line.join(" + ")} = 15` : "";
+/** Headline, subline and call to action for the finished game, used by the image and the caption. */
+function resultSummary() {
+  const { mode, diff, game } = app.get(), { winner } = boardView();
   if (mode === "online") {
-    const sh = shown(match.get()), opp = onlineNames(sh)[1], tc = sh ? ` (${tcLabel(sh.game)})` : "";
-    if (sh?.seat === null) return `👀 Just watched a live game of The 15-Game${tc}\n${home}`;
-    if (winner === 0) return `🏆 I beat ${opp} in a live game of The 15-Game${tc}${eq ? "\n" + eq : ""}\nThink you're quicker? ${home}`;
-    if (winner === null) return `🤝 Drew ${opp} in a live game of The 15-Game${tc}\n${home}`;
-    return `⏱ ${opp} beat me in a live game of The 15-Game${tc}. Rematch incoming.\n${home}`;
+    const sh = shown(match.get()), names = onlineNames(sh), opp = names[1], tc = sh ? tcLabel(sh.game) : "";
+    const how = sh?.game.reason === "time" ? " on time" : sh?.game.reason === "resign" ? " by resignation" : "";
+    if (sh?.seat === null) return { headline: winner === null ? "A draw" : `${names[winner]} wins`, sub: `Live match · ${tc}`, cta: "Play:" };
+    if (winner === 0) return { headline: `I beat ${opp}`, sub: `Live match${how} · ${tc}`, cta: "Think you're quicker?" };
+    if (winner === null) return { headline: `Draw with ${opp}`, sub: `Live match · ${tc}`, cta: "Your turn:" };
+    return { headline: `${opp} beat me`, sub: `Live match${how} · ${tc}`, cta: "Rematch incoming. Play:" };
   }
-  if (mode === "local") return `Just played The 15-Game — ${winner === null ? "a draw!" : `Player ${winner + 1} won with ${eq}`}\n${home}`;
+  if (mode === "local") return { headline: winner === null ? "A draw" : `Player ${winner + 1} wins`, sub: "Pass & play", cta: "Play:" };
   const label = DIFF[diff].label;
-  if (winner === 0) return `🏆 I beat the ${label} AI at The 15-Game in ${game.hands[0].length} picks\n${eq}\nCan you? ${home}`;
+  if (winner === 0) return { headline: `I beat the ${label} AI`, sub: `${label} mode · ${game.hands[0].length} picks`, cta: "Can you?" };
   if (winner === null) return diff === "hard"
-    ? `🤝 I held the unbeatable AI to a draw at The 15-Game\nCan you? ${home}`
-    : `🤝 Drew the ${label} AI at The 15-Game\nYour turn: ${home}`;
-  return `🤖 The ${label} AI beat me at The 15-Game\nThink you can do better? ${home}`;
+    ? { headline: "I drew the unbeatable AI", sub: "Hard mode · the best possible result", cta: "Can you?" }
+    : { headline: `Draw vs the ${label} AI`, sub: `${label} mode`, cta: "Your turn:" };
+  return { headline: `The ${label} AI beat me`, sub: `${label} mode`, cta: "Think you can do better?" };
+}
+
+const home = () => location.origin + location.pathname;
+function shareText(): string {
+  const s = resultSummary(), v = boardView();
+  return `${s.headline} at The 15-Game (${s.sub})\n${emojiGrid(v.hands, v.line)}\n${s.cta} ${home()}`;
+}
+
+/** Shares a picture of the final board with a caption; falls back to download + copy, then text. */
+async function shareResult() {
+  const s = resultSummary(), v = boardView(), text = shareText();
+  const labels = v.names.map(n => n.length > 10 ? n.slice(0, 9) + "…" : n) as [string, string];
+  const blob = await renderShareImage({ headline: s.headline, sub: s.sub, hands: v.hands, line: v.line, labels }).catch(() => null);
+  const file = blob ? new File([blob], "the-15-game.png", { type: "image/png" }) : null;
+  if (file && navigator.canShare?.({ files: [file] })) {
+    try { return void await navigator.share({ files: [file], text }); }
+    catch (e) { if ((e as Error).name === "AbortError") return; }
+  }
+  if (file) {
+    const a = Object.assign(document.createElement("a"), { href: URL.createObjectURL(file), download: file.name });
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    return copy(text, "Image saved · caption copied");
+  }
+  return share(text);
 }
 
 function challengeText(): string {
   const { game: g, gameId } = match.get();
   const who = g?.hostName ? `${g.hostName} challenged` : "I'm challenging";
-  return `⚔️ ${who} you to a live game of The 15-Game (${g ? tcLabel(g) : ""} per player). First to hold three numbers that add up to 15 wins.\n${gameId ? gameUrl(gameId) : ""}`;
+  return `⚔️ ${who} you to a live game of The 15-Game (${g ? tcLabel(g) : ""} per player). First to hold three numbers that add up to 15 wins.\n${gameId ? gameUrl(gameId) : home()}`;
 }
 
 // ---------- Wiring ----------
@@ -170,7 +202,19 @@ const goOnline = () => void startSocial().catch(() => {});
 initBoard(onPick);
 $("newBtn").onclick = () => controlAction().run?.();
 $("againBtn").onclick = () => resultAction().run?.();
-$("shareBtn").onclick = () => share(shareText());
+$("shareBtn").onclick = () => void shareResult();
+$("resClose").onclick = () => app.set({ sheet: null });
+$("status").addEventListener("click", e => {
+  if ((e.target as HTMLElement).closest("[data-act=result]")) app.set({ sheet: "result" });
+});
+$("onlineSheet").addEventListener("click", e => {
+  const edit = (e.target as HTMLElement).closest("[data-edit-name]");
+  if (!edit) return;
+  const show = edit.closest(".name-show") as HTMLElement, field = show.nextElementSibling as HTMLElement;
+  show.hidden = true;
+  field.hidden = false;
+  field.querySelector("input")!.focus();
+});
 $("hints").onchange = e => app.set({ hints: (e.target as HTMLInputElement).checked });
 document.querySelectorAll<HTMLButtonElement>("#diffSeg button").forEach(b =>
   b.onclick = () => setDifficulty(b.dataset.diff as Difficulty));
@@ -235,11 +279,5 @@ if (linked && /^[a-z0-9]{8}$/.test(linked)) {
   newGame();
   // Returning online players listen for challenges from anywhere in the app.
   try { if (localStorage.getItem("pick15-online")) goOnline(); } catch {}
-  try {
-    if (!localStorage.getItem("pick15-seen")) {
-      app.set({ sheet: "help" });
-      localStorage.setItem("pick15-seen", "1");
-    }
-  } catch {}
 }
 render();

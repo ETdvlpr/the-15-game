@@ -8,6 +8,7 @@ export type Side = 0 | 1;
 export interface LocalGame {
   id: number;
   hands: Hands;
+  starter: Side;
   turn: Side;
   over: boolean;
   winner: Side | null;
@@ -25,7 +26,7 @@ export interface AppState {
 }
 
 const emptyGame = (id: number, turn: Side): LocalGame =>
-  ({ id, hands: [[], []], turn, over: false, winner: null, line: null, thinking: false });
+  ({ id, hands: [[], []], starter: turn, turn, over: false, winner: null, line: null, thinking: false });
 
 export const app = createStore<AppState>({
   mode: "ai", diff: "medium", hints: false, nextStarter: 0, game: emptyGame(0, 0), sheet: null,
@@ -37,6 +38,15 @@ export const localEvents = new EventTarget();
 // ---------- Stats (per-viewer convenience only) ----------
 export type Record3 = { w: number; d: number; l: number };
 export interface Stats { easy?: Record3; medium?: Record3; hard?: Record3; streak?: number }
+
+/** Coaching is on for newcomers' first games and whenever the AI is on Easy. */
+export function coaching() {
+  const { mode, diff } = app.get();
+  if (mode !== "ai") return false;
+  const s = loadStats(), played = (["easy", "medium", "hard"] as const)
+    .reduce((n, d) => n + (s[d] ? s[d]!.w + s[d]!.d + s[d]!.l : 0), 0);
+  return diff === "easy" || played < 3;
+}
 
 export function loadStats(): Stats {
   try { return JSON.parse(localStorage.getItem("pick15-stats") ?? "{}") ?? {}; } catch { return {}; }

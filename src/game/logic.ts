@@ -58,3 +58,66 @@ export function aiChoose(diff: Difficulty, me: number[], opp: number[]): number 
   if (threats.length && Math.random() < .35) return rnd(threats);
   return rnd(free);
 }
+
+// ---------- Analysis (coaching and post-game insights) ----------
+export interface Move { n: number; side: 0 | 1 }
+
+/** Moves in play order, rebuilt from both hands and who started (turns strictly alternate). */
+export function moveOrder(hands: Hands, starter: 0 | 1): Move[] {
+  const out: Move[] = [], next = [0, 0];
+  let side = starter;
+  while (next[side] < hands[side].length) {
+    out.push({ n: hands[side][next[side]++], side });
+    side = (1 - side) as 0 | 1;
+  }
+  return out;
+}
+
+/** The two cards in `hand` that make 15 with `card`. */
+export const pairFor = (hand: readonly number[], card: number) =>
+  LINES.find(l => l.includes(card) && l.filter(n => n !== card).every(n => hand.includes(n)))?.filter(n => n !== card) ?? [];
+
+/** One sentence on how the game was decided, from `me`'s point of view (null if nothing notable). */
+export function insight(hands: Hands, starter: 0 | 1, winner: 0 | 1 | null, me: 0 | 1, them: string): string | null {
+  if (winner === null) return null;
+  const Them = them[0].toUpperCase() + them.slice(1);
+  const loser = (1 - winner) as 0 | 1;
+  const h: Hands = [[], []];
+  let missedWin: { card: number; hand: number[] } | null = null;
+  let last: { threats: number[]; played: number } | null = null;
+  for (const m of moveOrder(hands, starter)) {
+    if (m.side === loser) {
+      const free = freeCards(h), wins = winningCards(h[loser], free);
+      if (wins.length && !wins.includes(m.n) && !missedWin) missedWin = { card: wins[0], hand: [...h[loser]] };
+      last = { threats: winningCards(h[winner], free), played: m.n };
+    }
+    h[m.side].push(m.n);
+  }
+  const fork = last && last.threats.length >= 2 ? last.threats.slice(0, 2) : null;
+  if (winner === me) return fork ? `You forked ${them}: two threats at once (${fork[0]} and ${fork[1]}). They could only block one.` : null;
+  if (missedWin) {
+    const [a, b] = pairFor(missedWin.hand, missedWin.card);
+    return `You had a win: ${a} + ${b} + ${missedWin.card} = 15.`;
+  }
+  if (fork) return `${Them} had two threats at once (${fork[0]} and ${fork[1]}). You could only block one — that's a fork.`;
+  if (last && last.threats.length === 1 && last.played !== last.threats[0]) return `You missed a block: ${Them} needed ${last.threats[0]}.`;
+  return null;
+}
+
+/** A tip for the player to move, for coaching mode. */
+export function coachTip(hands: Hands, me: 0 | 1, them: string): { text: string; win: number[]; block: number[] } {
+  them = them[0].toUpperCase() + them.slice(1);
+  const free = freeCards(hands), mine = hands[me], theirs = hands[1 - me];
+  const wins = winningCards(mine, free), threats = winningCards(theirs, free);
+  if (wins.length) {
+    const [a, b] = pairFor(mine, wins[0]);
+    return { text: `🎯 Take ${wins[0]} to win: ${a} + ${b} + ${wins[0]} = 15`, win: wins, block: [] };
+  }
+  if (threats.length >= 2) return { text: `😬 ${them} has two threats (${threats[0]} and ${threats[1]}). Block one and hope!`, win: [], block: threats };
+  if (threats.length) {
+    const [a, b] = pairFor(theirs, threats[0]);
+    return { text: `⚠️ ${them} needs ${threats[0]} (${a} + ${b} + ${threats[0]}). Block it!`, win: [], block: threats };
+  }
+  if (!mine.length && !theirs.length) return { text: "👋 Pick any card. Collect three that add up to 15. Tip: 5 is in the most combos.", win: [], block: [] };
+  return { text: "💡 Aim for two ways to make 15 at once — they can only block one.", win: [], block: [] };
+}

@@ -4,6 +4,7 @@ import { sfx } from "./sound";
 
 const cards: Record<number, HTMLButtonElement> = {};
 let lastKey = "";
+let lastMoveKey = "";
 
 export function initBoard(onPick: (n: number) => void) {
   const deck = $("deck");
@@ -91,9 +92,22 @@ export function renderBoard(v: BoardView) {
     c.classList.toggle("by1", o === 1);
     c.classList.toggle("hint-win", win);
     c.classList.toggle("hint-block", block);
-    c.querySelector(".tag")!.textContent = win ? "WIN" : block ? "BLOCK" : "";
+    c.classList.toggle("last", v.lastMove?.n === n);
+    // Taken cards carry their owner's label so ownership doesn't rely on colour alone.
+    c.querySelector(".tag")!.textContent = o !== null ? v.avatars[o] : win ? "WIN" : block ? "BLOCK" : "";
     c.disabled = o !== null || !v.canPick;
     c.setAttribute("aria-label", o === null ? `Take ${n}` : `${n}, taken by ${v.names[o]}`);
   }
+  // Pulse the card that was just taken.
+  const moveKey = v.lastMove ? `${v.key}:${v.lastMove.n}` : "";
+  if (moveKey && moveKey !== lastMoveKey && !newBoard && !reducedMotion()) {
+    cards[v.lastMove!.n].animate(
+      [{ boxShadow: "0 0 0 0 rgba(255,207,92,.9)" }, { boxShadow: "0 0 0 14px rgba(255,207,92,0)" }],
+      { duration: 900, easing: "ease-out", iterations: 2 });
+  }
+  lastMoveKey = moveKey;
+
   $("status").innerHTML = v.status;
+  $("coach").hidden = !v.coach;
+  $("coach").textContent = v.coach ?? "";
 }

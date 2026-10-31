@@ -38,7 +38,7 @@ button { font: inherit; color: inherit; }
   padding: max(14px, env(safe-area-inset-top)) 16px max(20px, env(safe-area-inset-bottom));
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
   min-height: 100dvh;
 }
 
@@ -68,8 +68,6 @@ button { font: inherit; color: inherit; }
 }
 .icon-btn:hover { background: rgba(255,255,255,.08); }
 
-.tagline { margin: -4px 0 0; color: var(--muted); font-size: 14px; line-height: 1.4; }
-.tagline b { color: var(--text); font-weight: 500; }
 
 /* ---------- Player panels ---------- */
 .player {
@@ -93,7 +91,7 @@ button { font: inherit; color: inherit; }
 .sub { color: var(--muted); font-size: 12px; }
 .needs { margin-left: auto; font-size: 12px; font-weight: 700; color: var(--c); }
 
-.hand { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; max-width: 300px; }
+.hand { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; max-width: 250px; }
 .slot {
   aspect-ratio: 1 / 1;
   border-radius: 10px;
@@ -137,7 +135,7 @@ button { font: inherit; color: inherit; }
   grid-template-columns: repeat(3, 1fr);
   gap: 10px;
   width: 100%;
-  max-width: 300px;
+  max-width: clamp(200px, calc(100dvh - 440px), 300px);
   margin: 0 auto;
 }
 .card {
@@ -186,12 +184,17 @@ button { font: inherit; color: inherit; }
 .card.hint-block .tag { background: var(--ai); }
 
 /* ---------- Controls ---------- */
+/* Fixed bottom bar so the main action is always reachable */
 .controls {
+  position: sticky; bottom: 0; z-index: 5;
   margin-top: auto;
-  display: grid; gap: 10px;
-  border-top: 1px solid var(--line);
-  padding-top: 14px;
+  display: flex; gap: 10px; align-items: center; justify-content: space-between;
+  padding: 12px 0 max(4px, env(safe-area-inset-bottom));
+  background: linear-gradient(to bottom, rgba(14,19,32,0), var(--bg) 35%);
 }
+.controls #newBtn { margin-left: auto; }
+.tabs { margin-top: -2px; }
+.tabs button { padding-block: 9px; }
 .row { display: flex; gap: 10px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
 .seg {
   display: inline-flex; padding: 3px; gap: 2px;
@@ -233,6 +236,7 @@ button { font: inherit; color: inherit; }
 }
 .backdrop[hidden] { display: none; }
 .sheet {
+  position: relative;
   width: 100%; max-width: 420px;
   background: var(--bg-2); border: 1px solid var(--line);
   border-radius: 22px;
@@ -398,7 +402,6 @@ button { font: inherit; color: inherit; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
-@media (min-height: 820px) { .app { gap: 18px; padding-top: 28px; } }
 
 /* Incoming challenge / rematch pop-up */
 .invite-pop { z-index: 35; align-items: center; }
@@ -418,3 +421,63 @@ button { font: inherit; color: inherit; }
 
 @keyframes popIn { from { transform: scale(.7) translateY(20px); opacity: 0; } to { transform: none; opacity: 1; } }
 @keyframes wiggle { 20% { transform: rotate(-14deg); } 40% { transform: rotate(12deg); } 60% { transform: rotate(-8deg); } 80% { transform: rotate(4deg); } }
+
+/* Coaching */
+.coach {
+  margin: -6px auto 0; max-width: 340px; padding: 9px 12px; border-radius: 12px;
+  background: rgba(122,162,255,.1); border: 1px solid rgba(122,162,255,.3);
+  font-size: 13.5px; line-height: 1.4; text-align: center; animation: rise .3s ease;
+}
+.coach[hidden] { display: none; }
+.insight {
+  margin: 14px 0 0 !important; padding: 10px 12px; border-radius: 12px; text-align: left;
+  background: rgba(122,162,255,.1); border: 1px solid rgba(122,162,255,.3);
+  color: var(--text) !important; font-size: 14px;
+}
+.insight::before { content: "💡 "; }
+.insight[hidden] { display: none; }
+.status .link-btn { margin-left: 8px; font-size: 14px; }
+
+/* Ownership + last move */
+.card.taken .tag { top: 6px; right: 6px; font-size: 9px; padding: 2px 6px; }
+.card.taken.by0 .tag { background: var(--you); }
+.card.taken.by1 .tag { background: var(--ai); }
+.card.taken.last { border-style: solid; }
+
+/* Result sheet: peek at the board */
+.sheet-close {
+  position: absolute; top: 14px; right: 14px;
+  border: 1px solid var(--line); background: var(--panel); color: var(--muted);
+  font-size: 12px; font-weight: 700; padding: 6px 10px; border-radius: 999px; cursor: pointer;
+}
+
+/* Name once */
+.name-show { font-size: 14px; color: var(--muted); }
+.name-show b { color: var(--text); }
+.name-show[hidden], .name-edit[hidden] { display: none; }
+.name-edit.stack { margin: 0; }
+
+.controls .btn { white-space: nowrap; }
+.controls .seg button { padding-inline: 10px; }
+
+/* Short screens (in-app browsers with toolbars): tighten everything so the board fits */
+@media (max-height: 760px) {
+  .app { gap: 8px; padding-top: max(8px, env(safe-area-inset-top)); }
+  .logo { width: 32px; height: 32px; font-size: 15px; }
+  .brand h1 { font-size: 21px; }
+  .icon-btn { width: 32px; height: 32px; }
+  .tabs button { padding-block: 6px; }
+  .player { padding: 8px 10px; }
+  .who { margin-bottom: 6px; }
+  .avatar { width: 26px; height: 26px; font-size: 11px; }
+  .sub { font-size: 11px; }
+  .hand { max-width: 190px; gap: 6px; }
+  .mini { font-size: 18px; border-radius: 8px; }
+  .slot { border-radius: 8px; }
+  .status { font-size: 14px; min-height: 20px; }
+  .coach { margin-top: -4px; padding: 6px 10px; font-size: 12.5px; }
+  .deck { gap: 8px; max-width: clamp(180px, calc(100dvh - 445px), 300px); }
+  .card .corner { display: none; }
+  .card .num { font-size: clamp(28px, calc((100dvh - 445px) * .19), 44px); }
+  .controls { padding-top: 8px; }
+}

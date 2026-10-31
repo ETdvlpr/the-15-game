@@ -181,7 +181,7 @@ function renderOnlineSheet(m: MatchState, part: string) {
   const notice = (id: string) => { $(id).hidden = !m.notice; $(id).textContent = m.notice ?? ""; };
 
   if (part === "olCreate") {
-    if (entering) $<HTMLInputElement>("olName").value ||= savedName();
+    nameField("olName", entering);
     document.querySelectorAll<HTMLButtonElement>("#tcSeg button").forEach(b =>
       b.setAttribute("aria-pressed", String(+b.dataset.base! === m.tc.base)));
     applyAction($("olCreateBtn") as HTMLButtonElement, { label: "Create challenge link", loading: m.busy === "create" && !m.busyFor, disabled: !!m.busy });
@@ -199,7 +199,7 @@ function renderOnlineSheet(m: MatchState, part: string) {
     const g = m.game, host = g.hostName || "Someone";
     $("olInviteTitle").textContent = `${host} challenged you`;
     $("olInviteText").textContent = `A live game of The 15-Game, ${tcLabel(g)} per player. Hold three numbers that add up to 15 to win. ${g.starter === 0 ? `${host} moves first.` : "You move first."}`;
-    if (entering) $<HTMLInputElement>("olName2").value = savedName();
+    nameField("olName2", entering);
     applyAction($("olAccept") as HTMLButtonElement, { label: "Accept & play", loading: m.phase === "joining" });
     notice("olInviteNotice");
   }
@@ -211,7 +211,24 @@ function renderOnlineSheet(m: MatchState, part: string) {
   }
 }
 
+/** Ask for a name once: afterwards show "Playing as X · Change". */
+function nameField(id: "olName" | "olName2", entering: boolean) {
+  if (!entering) return;
+  const name = savedName();
+  $<HTMLInputElement>(id).value = name;
+  $(id + "Show").hidden = !name;
+  $(id + "Edit").hidden = !!name;
+  $(id + "Show").querySelector(".name-text")!.textContent = name;
+}
+
+function setInsight() {
+  const { insight } = boardView();
+  $("resInsight").hidden = !insight;
+  $("resInsight").textContent = insight ?? "";
+}
+
 function setResult(emoji: string, title: string, text: string, line: number[] | null) {
+  setInsight();
   $("resEmoji").textContent = emoji;
   $("resTitle").textContent = title;
   $("resText").textContent = text;

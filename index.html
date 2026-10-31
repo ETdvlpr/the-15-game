@@ -37,7 +37,11 @@
       <button class="icon-btn" id="helpBtn" aria-label="How to play">?</button>
     </div>
   </header>
-  <p class="tagline">Take turns claiming numbers. First to hold <b>three that add up to 15</b> wins.</p>
+  <div class="seg wide tabs" id="modeSeg" role="tablist" aria-label="Game mode">
+    <button data-mode="ai" aria-pressed="true">vs AI</button>
+    <button data-mode="local" aria-pressed="false">Pass &amp; play</button>
+    <button data-mode="online" aria-pressed="false">Live match</button>
+  </div>
 
   <section class="player p1" id="panel1">
     <div class="who">
@@ -53,6 +57,7 @@
   </section>
 
   <div class="status" id="status" aria-live="polite"></div>
+  <div class="coach" id="coach" role="note" hidden></div>
 
   <div class="deck" id="deck"></div>
 
@@ -70,31 +75,24 @@
   </section>
 
   <div class="controls">
-    <div class="row">
-      <div class="seg" id="modeSeg">
-        <button data-mode="ai" aria-pressed="true">vs AI</button>
-        <button data-mode="local" aria-pressed="false">Pass &amp; play</button>
-        <button data-mode="online" aria-pressed="false">Live match</button>
-      </div>
-      <label class="switch" id="hintsSwitch"><input type="checkbox" id="hints"> Hints</label>
+    <div class="seg" id="diffSeg">
+      <button data-diff="easy" aria-pressed="false">Easy</button>
+      <button data-diff="medium" aria-pressed="true">Medium</button>
+      <button data-diff="hard" aria-pressed="false">Hard</button>
     </div>
-    <div class="row">
-      <div class="seg" id="diffSeg">
-        <button data-diff="easy" aria-pressed="false">Easy</button>
-        <button data-diff="medium" aria-pressed="true">Medium</button>
-        <button data-diff="hard" aria-pressed="false">Hard</button>
-      </div>
-      <button class="btn ghost small" id="newBtn">New game</button>
-    </div>
+    <label class="switch" id="hintsSwitch" title="Show hints"><input type="checkbox" id="hints" aria-label="Show hints"> 💡</label>
+    <button class="btn ghost small" id="newBtn">New game</button>
   </div>
 </div>
 
 <div class="backdrop" id="resultSheet" hidden>
   <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="resTitle">
+    <button class="sheet-close" id="resClose" aria-label="View board">View board</button>
     <div class="big-emoji" id="resEmoji"></div>
     <h2 id="resTitle"></h2>
     <p id="resText"></p>
     <div class="eq" id="resEq"></div>
+    <p class="insight" id="resInsight" hidden></p>
     <div class="stats" id="resStats"></div>
     <div class="rematch-wait" id="rmWait" role="status" hidden>
       <div class="row-line"><span class="ring"></span><span id="rmWaitText"></span></div>
@@ -132,8 +130,11 @@
       <h2>Live match</h2>
       <p>Challenge a friend to a timed game. Run out of time and you lose.</p>
       <div class="stack">
-        <label class="label" for="olName">Your name</label>
-        <input class="input" id="olName" maxlength="20" placeholder="So they know who's challenging" autocomplete="nickname">
+        <div class="name-show" id="olNameShow" hidden>Playing as <b class="name-text"></b> · <button class="link-btn" data-edit-name>Change</button></div>
+        <div class="name-edit stack" id="olNameEdit">
+          <label class="label" for="olName">Your name</label>
+          <input class="input" id="olName" maxlength="20" placeholder="So they know who's challenging" autocomplete="nickname">
+        </div>
         <span class="label">Time per player</span>
         <div class="seg wide" id="tcSeg">
           <button data-base="15000" data-inc="1000" aria-pressed="false">15s +1</button>
@@ -161,8 +162,11 @@
       <h2 id="olInviteTitle">You've been challenged</h2>
       <p id="olInviteText"></p>
       <div class="stack">
-        <label class="label" for="olName2">Your name</label>
-        <input class="input" id="olName2" maxlength="20" placeholder="Optional" autocomplete="nickname">
+        <div class="name-show" id="olName2Show" hidden>Playing as <b class="name-text"></b> · <button class="link-btn" data-edit-name>Change</button></div>
+        <div class="name-edit stack" id="olName2Edit">
+          <label class="label" for="olName2">Your name</label>
+          <input class="input" id="olName2" maxlength="20" placeholder="Optional" autocomplete="nickname">
+        </div>
       </div>
       <button class="btn primary full" id="olAccept">Accept &amp; play</button>
       <p class="notice" id="olInviteNotice" role="alert" hidden></p>
