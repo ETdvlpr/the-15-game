@@ -35,24 +35,59 @@ function negamax(me: number, opp: number): number {
   return best;
 }
 
-function bestMove(me: number[], opp: number[], free: number[]) {
-  const mm = toMask(me), om = toMask(opp);
-  const scored = free.map(n => {
-    const m = mm | bit(n);
-    return { n, v: hasLine(m) ? 100 - popcount(m | om) : -negamax(om, m) };
+// A model of a human who hasn't cracked the game: they take a win when they see one and
+// block a single threat, but otherwise don't plan ahead (no forks, no "take the 5").
+const chanceMemo = new Map<number, number>();
+
+/** Chance that we (to move, mask `me`) win against that human, playing only perfect moves. */
+function winChance(me: number, opp: number): number {
+  const key = me * 1024 + opp;
+  const hit = chanceMemo.get(key);
+  if (hit !== undefined) return hit;
+  let best = 0;
+  for (const m of perfectMoves(me, opp)) best = Math.max(best, hasLine(m) ? 1 : humanReplies(m, opp));
+  chanceMemo.set(key, best);
+  return best;
+}
+
+function humanReplies(ai: number, human: number): number {
+  const free = CARDS.filter(n => !((ai | human) & bit(n)));
+  if (!free.length) return 0;
+  if (free.some(n => hasLine(human | bit(n)))) return 0; // they see their win
+  const blocks = free.filter(n => hasLine(ai | bit(n)));
+  const options = blocks.length ? blocks : free;
+  return options.reduce((sum, n) => sum + winChance(ai, human | bit(n)), 0) / options.length;
+}
+
+/** Our moves (as resulting masks) that keep the game-theoretic best result. */
+function perfectMoves(me: number, opp: number): number[] {
+  const scored = CARDS.filter(n => !((me | opp) & bit(n))).map(n => {
+    const m = me | bit(n);
+    return { m, v: hasLine(m) ? 100 - popcount(m | opp) : -negamax(opp, m) };
   });
   const top = Math.max(...scored.map(s => s.v));
-  return rnd(scored.filter(s => s.v === top).map(s => s.n));
+  return scored.filter(s => s.v === top).map(s => s.m);
+}
+
+/**
+ * Perfect play (it can't lose), but among equally good moves it picks the one most likely to
+ * beat a real person: the traps and forks. Without this it drifts into safe draws.
+ */
+function bestMove(me: number[], opp: number[]) {
+  const mm = toMask(me), om = toMask(opp);
+  const options = perfectMoves(mm, om).map(m => ({ n: Math.log2(m ^ mm), c: hasLine(m) ? 2 : humanReplies(m, om) }));
+  const top = Math.max(...options.map(o => o.c));
+  return rnd(options.filter(o => o.c >= top - 1e-9).map(o => o.n));
 }
 
 export function aiChoose(diff: Difficulty, me: number[], opp: number[]): number {
   const free = freeCards([me, opp]);
   const wins = winningCards(me, free), threats = winningCards(opp, free);
-  if (diff === "hard") return bestMove(me, opp, free);
+  if (diff === "hard") return bestMove(me, opp);
   if (diff === "medium") {
     if (wins.length) return rnd(wins);
     if (threats.length && Math.random() < .9) return rnd(threats);
-    return Math.random() < .5 ? bestMove(me, opp, free) : rnd(free);
+    return Math.random() < .5 ? bestMove(me, opp) : rnd(free);
   }
   if (wins.length && Math.random() < .6) return rnd(wins);
   if (threats.length && Math.random() < .35) return rnd(threats);
@@ -94,18 +129,21 @@ export function insight(hands: Hands, starter: 0 | 1, winner: 0 | 1 | null, me: 
     h[m.side].push(m.n);
   }
   const fork = last && last.threats.length >= 2 ? last.threats.slice(0, 2) : null;
-  if (winner === me) return fork ? `You forked ${them}: two threats at once (${fork[0]} and ${fork[1]}). They could only block one.` : null;
+  if (winner === me) return fork ? `You had two ways to make 15 (${fork[0]} or ${fork[1]}). ${Them} could only stop one.` : null;
   if (missedWin) {
     const [a, b] = pairFor(missedWin.hand, missedWin.card);
     return `You had a win: ${a} + ${b} + ${missedWin.card} = 15.`;
   }
-  if (fork) return `${Them} had two threats at once (${fork[0]} and ${fork[1]}). You could only block one — that's a fork.`;
+  if (fork) return `${Them} had two ways to make 15 (${fork[0]} or ${fork[1]}). You could only stop one.`;
   if (last && last.threats.length === 1 && last.played !== last.threats[0]) return `You missed a block: ${Them} needed ${last.threats[0]}.`;
   return null;
 }
 
-/** A tip for the player to move, for coaching mode. */
-export function coachTip(hands: Hands, me: 0 | 1, them: string): { text: string; win: number[]; block: number[] } {
+/**
+ * A tip for the player to move, for coaching mode. Deliberately limited to the rule and the
+ * arithmetic (what you or they need for 15); the strategy is left for players to discover.
+ */
+export function coachTip(hands: Hands, me: 0 | 1, them: string): { text: string; win: number[]; block: number[] } | null {
   them = them[0].toUpperCase() + them.slice(1);
   const free = freeCards(hands), mine = hands[me], theirs = hands[1 - me];
   const wins = winningCards(mine, free), threats = winningCards(theirs, free);
@@ -113,11 +151,11 @@ export function coachTip(hands: Hands, me: 0 | 1, them: string): { text: string;
     const [a, b] = pairFor(mine, wins[0]);
     return { text: `🎯 Take ${wins[0]} to win: ${a} + ${b} + ${wins[0]} = 15`, win: wins, block: [] };
   }
-  if (threats.length >= 2) return { text: `😬 ${them} has two threats (${threats[0]} and ${threats[1]}). Block one and hope!`, win: [], block: threats };
+  if (threats.length >= 2) return { text: `😬 ${them} can make 15 with ${threats[0]} or ${threats[1]}. You can only take one.`, win: [], block: threats };
   if (threats.length) {
     const [a, b] = pairFor(theirs, threats[0]);
     return { text: `⚠️ ${them} needs ${threats[0]} (${a} + ${b} + ${threats[0]}). Block it!`, win: [], block: threats };
   }
-  if (!mine.length && !theirs.length) return { text: "👋 Pick any card. Collect three that add up to 15. Tip: 5 is in the most combos.", win: [], block: [] };
-  return { text: "💡 Aim for two ways to make 15 at once — they can only block one.", win: [], block: [] };
+  if (!mine.length) return { text: "👋 Take turns picking cards. First to hold three that add up to exactly 15 wins.", win: [], block: [] };
+  return null;
 }
