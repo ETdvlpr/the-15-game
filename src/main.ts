@@ -1,18 +1,23 @@
 import "./styles.css";
 import { app, localEvents, newGame, pickLocal, setDifficulty, setMode, type LocalGame, type Mode } from "./local";
 import {
-  acceptRematch, checkFlag, join, leave, match, matchEvents, move, openGame, retry,
-  serverNow, setTimeControl, shown, startChallenge, type MatchState,
+  challengeFriend, checkFlag, declineInvite, join, leave, match, matchEvents, move, openGame,
+  resolveRematchRace, retry, serverNow, setTimeControl, shown, startChallenge, type MatchState,
 } from "./online/match";
+import { social, startSocial } from "./online/social";
 import { clockMs, countdownLeft, fmtClock, tcLabel } from "./online/clock";
 import type { Seat } from "./online/types";
 import { boardView, DIFF, onlineNames } from "./view";
 import { cardEl, initBoard, renderBoard } from "./ui/board";
-import { controlAction, gameUrl, renderControls, renderSheets, resultAction, saveName } from "./ui/sheets";
+import {
+  acceptAndGo, controlAction, currentInvite, dismissInvite, gameUrl, renderControls, renderSheets,
+  resultAction, savedName, saveName,
+} from "./ui/sheets";
 import { $, confetti, copy, share, shake, toast } from "./ui/dom";
+import { isMuted, setMuted, sfx, unlockAudio } from "./ui/sound";
 import type { Difficulty } from "./game/logic";
 
-// ---------- Rendering: everything is derived from the two stores ----------
+// ---------- Rendering: everything is derived from the stores ----------
 let queued = false;
 function render() {
   if (queued) return;
@@ -26,6 +31,7 @@ function render() {
 }
 app.subscribe(render);
 match.subscribe(render);
+social.subscribe(render);
 
 // ---------- Reactions to state transitions ----------
 let resultTimer = 0;
@@ -33,10 +39,13 @@ const showResultAfter = (ms: number) => {
   clearTimeout(resultTimer);
   resultTimer = window.setTimeout(() => app.set({ sheet: "result" }), ms);
 };
+const endSound = (winner: 0 | 1 | null, iWin: boolean) => (winner === null ? sfx.draw : iWin ? sfx.win : sfx.lose)();
 
 localEvents.addEventListener("over", e => {
   const g = (e as CustomEvent<LocalGame>).detail, { mode } = app.get();
-  if ((mode === "ai" && g.winner === 0) || (mode === "local" && g.winner !== null)) confetti();
+  const celebrate = (mode === "ai" && g.winner === 0) || (mode === "local" && g.winner !== null);
+  if (celebrate) confetti();
+  endSound(g.winner, celebrate);
   showResultAfter(g.line ? 1100 : 600);
 });
 
@@ -62,20 +71,36 @@ function onPhase(m: MatchState, prev: MatchState) {
       break;
     case "over": {
       const live = prev.phase === "playing", { winner, line } = boardView();
-      if (live && winner === 0 && m.seat !== null) confetti();
+      if (live) {
+        const iWin = winner === 0 && m.seat !== null;
+        if (iWin) confetti();
+        endSound(winner, iWin || m.seat === null);
+      }
       showResultAfter(live ? (line ? 1100 : 500) : 0);
     }
   }
 }
 
+// Chime when a challenge pops up (it may have been held back until a game ended).
+let lastInvite: string | null = null;
+const checkInvite = () => {
+  const inv = currentInvite();
+  if (inv && inv.gid !== lastInvite) sfx.invite();
+  lastInvite = inv?.gid ?? null;
+};
+social.subscribe(checkInvite);
+match.subscribe(checkInvite);
+social.subscribe(s => resolveRematchRace(s.incoming, savedName()));
+
 matchEvents.addEventListener("rejected", e => {
   shake(cardEl((e as CustomEvent<number>).detail));
+  sfx.error();
   toast("Move rejected — your time ran out");
 });
 matchEvents.addEventListener("error", e => toast((e as CustomEvent<string>).detail));
 
 // ---------- Clocks, countdown and flag claims ----------
-let counting = false;
+let counting = false, lastCount = "", lastTickSec = -1;
 setInterval(() => {
   const m = match.get(), sh = shown(m), g = sh?.game;
   const show = app.get().mode === "online" && !!sh && !!g && g.status !== "waiting";
@@ -84,17 +109,23 @@ setInterval(() => {
   if (!show) { cd.hidden = true; return; }
   const now = serverNow(), me = (sh.seat ?? 0) as Seat;
   [me, (1 - me) as Seat].forEach((seat, panel) => {
-    const ms = clockMs(g, seat, now), el = $("clock" + panel);
+    const ms = clockMs(g, seat, now), el = $("clock" + panel), low = g.status === "playing" && g.turn === seat && ms < 5000;
     el.textContent = fmtClock(ms);
-    el.classList.toggle("low", g.status === "playing" && g.turn === seat && ms < 5000);
+    el.classList.toggle("low", low);
+    const sec = Math.ceil(ms / 1000);
+    if (low && panel === 0 && sh.seat !== null && ms > 0 && sec !== lastTickSec) { lastTickSec = sec; sfx.tick(); }
   });
   const left = countdownLeft(g, now);
   cd.hidden = left <= 0;
   if (left > 0) {
     const n = String(Math.min(3, Math.ceil(left / 1000)));
-    if (cd.textContent !== n) cd.innerHTML = `<span>${n}</span>`;
+    if (n !== lastCount) { lastCount = n; cd.innerHTML = `<span>${n}</span>`; sfx.count(); }
   }
-  if ((left > 0) !== counting) { counting = left > 0; render(); } // countdown over: cards unlock
+  if ((left > 0) !== counting) { // countdown over: cards unlock
+    counting = left > 0;
+    if (!counting) { lastCount = ""; sfx.go(); }
+    render();
+  }
   checkFlag();
 }, 100);
 
@@ -134,6 +165,7 @@ const nameFrom = (id: string) => {
   return name;
 };
 const closeSheet = () => app.set({ sheet: null });
+const goOnline = () => void startSocial().catch(() => {});
 
 initBoard(onPick);
 $("newBtn").onclick = () => controlAction().run?.();
@@ -145,6 +177,7 @@ document.querySelectorAll<HTMLButtonElement>("#diffSeg button").forEach(b =>
 document.querySelectorAll<HTMLButtonElement>("#modeSeg button").forEach(b => b.onclick = () => {
   const mode = b.dataset.mode as Mode, current = app.get().mode;
   if (mode === "online") {
+    goOnline();
     if (current !== "online") setMode("online");
     if (match.get().phase === "idle") app.set({ sheet: "online" });
     return;
@@ -155,31 +188,53 @@ document.querySelectorAll<HTMLButtonElement>("#modeSeg button").forEach(b => b.o
 document.querySelectorAll<HTMLButtonElement>("#tcSeg button").forEach(b =>
   b.onclick = () => setTimeControl({ base: +b.dataset.base!, inc: +b.dataset.inc! }));
 $("olCreateBtn").onclick = () => startChallenge(nameFrom("olName"));
+$("olFriends").addEventListener("click", e => {
+  const uid = (e.target as HTMLElement).closest<HTMLButtonElement>("button[data-uid]")?.dataset.uid;
+  const friend = social.get().opponents.find(o => o.uid === uid);
+  if (friend) void challengeFriend(friend, nameFrom("olName"));
+});
 $("olAccept").onclick = () => join(nameFrom("olName2"));
 $("olShare").onclick = () => share(challengeText());
 $("olCopy").onclick = () => { const id = match.get().gameId; if (id) copy(gameUrl(id), "Link copied"); };
 $("rmCopy").onclick = () => { const id = match.get().gameId; if (id) copy(gameUrl(id), "Rematch link copied"); };
 $("olMsgAi").onclick = () => { leave(); setMode("ai"); };
 $("olMsgRetry").onclick = () => retry();
-$("rematchBarBtn").onclick = () => { app.set({ sheet: "result" }); void acceptRematch(); };
+$("ipAccept").onclick = () => { const inv = currentInvite(); if (inv) acceptAndGo(inv); };
+$("ipDecline").onclick = () => {
+  const inv = currentInvite();
+  if (!inv) return;
+  dismissInvite(inv.gid);
+  void declineInvite(inv);
+  render();
+};
 $("helpBtn").onclick = () => app.set({ sheet: "help" });
 $("helpClose").onclick = closeSheet;
+const syncMute = () => {
+  $("muteBtn").textContent = isMuted() ? "🔇" : "🔊";
+  $("muteBtn").setAttribute("aria-label", isMuted() ? "Unmute sounds" : "Mute sounds");
+};
+$("muteBtn").onclick = () => { setMuted(!isMuted()); syncMute(); if (!isMuted()) sfx.pick(); };
+syncMute();
 for (const id of ["helpSheet", "resultSheet", "onlineSheet"]) {
   $(id).addEventListener("click", e => { if ((e.target as HTMLElement).id === id) closeSheet(); });
 }
 document.addEventListener("keydown", e => {
   if (e.key === "Escape") return closeSheet();
   if ((e.target as HTMLElement).tagName === "INPUT") return;
-  if (/^[1-9]$/.test(e.key) && app.get().sheet === null) onPick(+e.key);
+  if (/^[1-9]$/.test(e.key) && app.get().sheet === null && !currentInvite()) onPick(+e.key);
 });
+for (const type of ["pointerdown", "keydown"]) document.addEventListener(type, unlockAudio, { once: true });
 
 // ---------- Boot ----------
 const linked = new URLSearchParams(location.search).get("g");
 if (linked && /^[a-z0-9]{8}$/.test(linked)) {
   app.set({ mode: "online" });
+  goOnline();
   void openGame(linked);
 } else {
   newGame();
+  // Returning online players listen for challenges from anywhere in the app.
+  try { if (localStorage.getItem("pick15-online")) goOnline(); } catch {}
   try {
     if (!localStorage.getItem("pick15-seen")) {
       app.set({ sheet: "help" });

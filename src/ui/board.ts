@@ -1,5 +1,6 @@
 import type { BoardView } from "../view";
 import { $, reducedMotion } from "./dom";
+import { sfx } from "./sound";
 
 const cards: Record<number, HTMLButtonElement> = {};
 let lastKey = "";
@@ -45,6 +46,7 @@ function fly(mini: HTMLElement, n: number) {
 export function renderBoard(v: BoardView) {
   const newBoard = v.key !== lastKey;
   if (newBoard) {
+    if (lastKey) sfx.deal();
     lastKey = v.key;
     deal();
   }
@@ -67,7 +69,10 @@ export function renderBoard(v: BoardView) {
         slot.dataset.n = String(n);
         slot.classList.add("has");
         slot.innerHTML = `<div class="mini">${n}</div>`;
-        if (!newBoard) fly(slot.firstElementChild as HTMLElement, n);
+        if (!newBoard) {
+          fly(slot.firstElementChild as HTMLElement, n);
+          (side === 0 ? sfx.pick : sfx.oppPick)();
+        }
       }
       slot.firstElementChild!.classList.toggle("trio", !!(v.line && v.winner === side && v.line.includes(n)));
     });

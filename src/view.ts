@@ -92,7 +92,8 @@ function onlineView(): BoardView {
   switch (m.phase) {
     case "idle": status = "Create a challenge to play live"; break;
     case "connecting": status = spin(m.rematch === "accepting" ? "Starting the rematch…" : m.prev ? "Setting up the rematch…" : "Connecting…"); break;
-    case "waiting": status = m.prev ? dots(`Waiting for ${opponent} to accept`) : dots("Waiting for an opponent"); break;
+    case "waiting": status = m.prev ? dots(`Waiting for ${opponent} to accept`)
+      : dots(m.invitee ? `Waiting for ${esc(m.invitee.name)}` : "Waiting for an opponent"); break;
     case "invited": status = m.prev ? spin("Starting the rematch…") : "You've been challenged"; break;
     case "joining": status = spin(m.prev ? "Starting the rematch…" : "Joining…"); break;
     case "error": status = esc(m.error?.title ?? "Something went wrong"); break;

@@ -1,12 +1,14 @@
 import { app, loadStats, newGame, setMode } from "../local";
 import { tcLabel } from "../online/clock";
-import { match, requestRematch, resign, shown, type MatchState } from "../online/match";
+import { acceptInvite, match, requestRematch, resign, shown, shownOpponent, type MatchState } from "../online/match";
+import { social, type Invite, type Opponent } from "../online/social";
 import { boardView, DIFF, onlineNames } from "../view";
 import { $ } from "./dom";
 
 export const gameUrl = (id: string) => `${location.origin}${location.pathname}?g=${id}`;
 export function savedName() { try { return localStorage.getItem("pick15-name") ?? ""; } catch { return ""; } }
 export function saveName(n: string) { try { localStorage.setItem("pick15-name", n); } catch {} }
+const esc = (s: string) => s.replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`);
 
 interface Action {
   label: string;
@@ -14,6 +16,30 @@ interface Action {
   variant?: "danger" | "glow";
   loading?: boolean;
   disabled?: boolean;
+}
+
+// ---------- Invites ----------
+const dismissed = new Set<string>();
+export const dismissInvite = (gid: string) => { dismissed.add(gid); };
+
+/** The invite to pop up now, if any. Held back while you're mid-game. */
+export function currentInvite(): Invite | null {
+  const m = match.get();
+  if (m.phase === "playing" || m.rematch === "accepting") return null;
+  return social.get().incoming.find(i => !dismissed.has(i.gid) && i.gid !== m.gameId) ?? null;
+}
+
+/** A rematch request from the opponent on screen. */
+function pendingRematch(m: MatchState): Invite | null {
+  const opp = shownOpponent(m);
+  return opp ? social.get().incoming.find(i => i.kind === "rematch" && i.from === opp) ?? null : null;
+}
+
+export function acceptAndGo(inv: Invite) {
+  dismissed.add(inv.gid);
+  if (app.get().mode !== "online") setMode("online");
+  app.set({ sheet: shownOpponent() === inv.from ? "result" : null });
+  void acceptInvite(inv, savedName());
 }
 
 // ---------- Primary actions (one source of truth for label + behaviour) ----------
@@ -24,10 +50,12 @@ function rematchAction(m: MatchState): Action {
   switch (m.rematch) {
     case "sending": return { label: "Rematch", loading: true };
     case "sent": return { label: "Rematch sent", disabled: true };
-    case "offered": return { label: "Accept rematch", run: requestRematch, variant: "glow" };
     case "accepting": return { label: "Accept rematch", loading: true };
-    default: return { label: "Rematch", run: requestRematch };
+    case "declined": return { label: "Declined", disabled: true };
   }
+  const theirs = pendingRematch(m);
+  if (theirs) return { label: "Accept rematch", run: () => acceptAndGo(theirs), variant: "glow" };
+  return { label: "Rematch", run: requestRematch };
 }
 
 /** The button under the board. */
@@ -93,11 +121,20 @@ export function renderSheets() {
   if (part) renderOnlineSheet(m, part);
   lastPart = part;
   if (a.sheet === "result") online ? renderOnlineResult(m) : renderLocalResult();
-
-  const offer = online && m.rematch === "offered" && a.sheet !== "result";
-  $("rematchBar").hidden = !offer;
-  if (offer) $("rematchBarName").textContent = onlineNames(shown(m))[1];
+  renderInvite();
   $("netBanner").hidden = !(online && m.offline);
+}
+
+function renderInvite() {
+  const inv = currentInvite(), pop = $("invitePop");
+  pop.hidden = !inv;
+  if (!inv) return;
+  const name = inv.fromName || "Someone";
+  const known = social.get().opponents.find(o => o.uid === inv.from);
+  $("ipEmoji").textContent = inv.kind === "rematch" ? "🔁" : "⚔️";
+  $("ipTitle").textContent = inv.kind === "rematch" ? `${name} wants a rematch` : `${name} challenges you`;
+  const record = known && known.w + known.d + known.l ? ` You're ${known.w}–${known.l}${known.d ? `–${known.d}` : ""} against them.` : "";
+  $("ipText").textContent = `A live game, ${tcLabel(inv)} per player.${record}`;
 }
 
 function onlinePart(m: MatchState): string | null {
@@ -112,6 +149,32 @@ function onlinePart(m: MatchState): string | null {
   }
 }
 
+function ago(ms: number) {
+  const min = Math.round((Date.now() - ms) / 60000);
+  if (min < 1) return "just now";
+  if (min < 60) return `${min}m ago`;
+  if (min < 60 * 24) return `${Math.round(min / 60)}h ago`;
+  return `${Math.round(min / 1440)}d ago`;
+}
+
+function renderFriends(m: MatchState) {
+  const { opponents, online } = social.get(), box = $("olFriends");
+  box.hidden = opponents.length === 0;
+  if (!opponents.length) return;
+  const row = (o: Opponent) => {
+    const on = !!online[o.uid], name = esc(o.name || "Anonymous");
+    const record = `${o.w}W ${o.l}L${o.d ? ` ${o.d}D` : ""}`;
+    const busy = m.busy === "create" && m.busyFor === o.uid;
+    return `<li class="friend">
+      <span class="avatar">${esc((o.name || "?")[0].toUpperCase())}</span>
+      <span class="who"><b>${name}</b><small><span class="presence ${on ? "on" : ""}"></span>${on ? "online now" : ago(o.last)} · ${record}</small></span>
+      <button class="btn small ${on ? "primary" : "ghost"}${busy ? " loading" : ""}" data-uid="${esc(o.uid)}" ${m.busy ? "disabled" : ""}>Challenge</button>
+    </li>`;
+  };
+  const html = `<span class="label">Recent opponents</span><ul>${opponents.map(row).join("")}</ul>`;
+  if (box.innerHTML !== html) box.innerHTML = html;
+}
+
 function renderOnlineSheet(m: MatchState, part: string) {
   const entering = part !== lastPart;
   for (const id of ["olCreate", "olLoading", "olWaiting", "olInvite", "olMsg"]) $(id).hidden = id !== part;
@@ -121,10 +184,17 @@ function renderOnlineSheet(m: MatchState, part: string) {
     if (entering) $<HTMLInputElement>("olName").value ||= savedName();
     document.querySelectorAll<HTMLButtonElement>("#tcSeg button").forEach(b =>
       b.setAttribute("aria-pressed", String(+b.dataset.base! === m.tc.base)));
-    applyAction($("olCreateBtn") as HTMLButtonElement, { label: "Create challenge link", loading: m.busy === "create" });
+    applyAction($("olCreateBtn") as HTMLButtonElement, { label: "Create challenge link", loading: m.busy === "create" && !m.busyFor, disabled: !!m.busy });
     notice("olCreateNotice");
+    renderFriends(m);
   }
-  if (part === "olWaiting" && m.gameId) $<HTMLInputElement>("olLink").value = gameUrl(m.gameId);
+  if (part === "olWaiting" && m.gameId) {
+    $<HTMLInputElement>("olLink").value = gameUrl(m.gameId);
+    $("olWaitTitle").textContent = m.invitee ? `Challenge sent to ${m.invitee.name}` : "Send this link";
+    $("olWaitText").textContent = m.invitee
+      ? "They'll get a pop-up if they have The 15-Game open. You can also send them this link."
+      : "The clock starts when your opponent accepts. Keep this page open.";
+  }
   if (part === "olInvite" && m.game) {
     const g = m.game, host = g.hostName || "Someone";
     $("olInviteTitle").textContent = `${host} challenged you`;
@@ -157,10 +227,10 @@ function renderLocalResult() {
   else if (ai) setResult("🤖", "AI wins", diff === "easy" ? "Even the casual AI got you. Rematch?" : "Watch for forks — two threats at once.", g.line);
   else setResult("🏆", `Player ${g.winner + 1} wins!`, `Won in ${g.hands[g.winner].length} picks.`, g.line);
 
-  const d = loadStats()[diff] ?? { w: 0, d: 0, l: 0 };
+  const stats = loadStats(), d = stats[diff] ?? { w: 0, d: 0, l: 0 };
   $("resStats").hidden = !ai;
-  $("resStats").innerHTML = `<div class="stat"><b>${d.w}</b><span>Won</span></div><div class="stat"><b>${d.d}</b><span>Drawn</span></div><div class="stat"><b>${d.l}</b><span>Lost</span></div><div class="stat"><b>${loadStats().streak ?? 0}</b><span>Streak</span></div>`;
-  $("rmOffer").hidden = $("rmWait").hidden = $("resNotice").hidden = true;
+  $("resStats").innerHTML = `<div class="stat"><b>${d.w}</b><span>Won</span></div><div class="stat"><b>${d.d}</b><span>Drawn</span></div><div class="stat"><b>${d.l}</b><span>Lost</span></div><div class="stat"><b>${stats.streak ?? 0}</b><span>Streak</span></div>`;
+  $("rmWait").hidden = $("resNotice").hidden = true;
   applyAction($("againBtn") as HTMLButtonElement, resultAction());
 }
 
@@ -183,13 +253,16 @@ function renderOnlineResult(m: MatchState) {
   $("resStats").hidden = true;
 
   // Rematch handshake
-  const offered = m.rematch === "offered", waiting = m.rematch === "sent" || m.rematch === "accepting";
-  $("rmOffer").hidden = !offered;
-  $("rmOfferName").textContent = opp;
-  $("rmWait").hidden = !waiting;
-  $("rmWaitText").textContent = m.rematch === "accepting" ? "Starting the rematch…" : `Waiting for ${opp} to accept…`;
-  const left = m.rematch === "sent" && m.oppOnline === false;
-  $("rmLeft").hidden = !left;
+  const states: Partial<Record<MatchState["rematch"], string>> = {
+    sent: `Waiting for ${opp} to accept…`,
+    accepting: "Starting the rematch…",
+    declined: `${opp} declined the rematch.`,
+  };
+  const msg = states[m.rematch];
+  $("rmWait").hidden = !msg;
+  $("rmWait").classList.toggle("declined", m.rematch === "declined");
+  $("rmWaitText").textContent = msg ?? "";
+  $("rmLeft").hidden = !(m.rematch === "sent" && m.oppOnline === false);
   $("rmLeftText").textContent = `${opp} has left the game.`;
   $("resNotice").hidden = !m.notice;
   $("resNotice").textContent = m.notice ?? "";

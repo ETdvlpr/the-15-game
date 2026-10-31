@@ -14,7 +14,7 @@ from pathlib import Path
 GRACE = 1500  # ms of latency allowance for a move (and before a time-out can be claimed)
 COUNTDOWN = 3000  # first mover gets base + 3s to cover the 3-2-1 countdown
 LINES = [(1,5,9),(1,6,8),(2,4,9),(2,5,8),(2,6,7),(3,4,8),(3,5,7),(4,5,6)]
-FIELDS = ["host","guest","hostName","guestName","base","inc","starter","createdAt","status",
+FIELDS = ["host","guest","hostName","guestName","invitee","base","inc","starter","createdAt","status",
           "turn","turnAt","prevAt","b0","b1","owe","h0","h1","last","winner","reason","rematch"]
 
 D = lambda f: f"data.child('{f}').val()"
@@ -37,11 +37,13 @@ create = AND(
     OR(f"{N('starter')} == 0", f"{N('starter')} == 1"),
     f"{N('createdAt')} == now",
     f"{N('h0')} == ''", f"{N('h1')} == ''",
+    f"{N('invitee')} != auth.uid",
     nulls("guest","guestName","turn","turnAt","prevAt","b0","b1","owe","last","winner","reason","rematch"),
 )
 
 join = AND(
     f"{D('status')} == 'waiting'", f"{D('guest')} == null", f"auth.uid != {D('host')}",
+    OR(f"{D('invitee')} == null", f"{D('invitee')} == auth.uid"),  # direct challenges: only the invitee
     f"{N('guest')} == auth.uid",
     f"{N('status')} == 'playing'",
     f"{N('turn')} == {D('starter')}",
@@ -99,7 +101,7 @@ str_field = lambda n: {".validate": f"newData.isString() && newData.val().length
 num_field = {".validate": "newData.isNumber()"}
 game_fields = {f: num_field for f in ["base","inc","starter","createdAt","turn","turnAt","prevAt","b0","b1","owe","winner"]}
 game_fields.update({
-    "host": str_field(128), "guest": str_field(128),
+    "host": str_field(128), "guest": str_field(128), "invitee": str_field(128),
     "hostName": str_field(20), "guestName": str_field(20),
     "status": str_field(10), "h0": str_field(9), "h1": str_field(9),
     "last": str_field(1), "reason": str_field(10), "rematch": str_field(8),
@@ -118,6 +120,63 @@ rules = {
                                  OR(create, join, move(0), move(1), timeout(0), timeout(1),
                                     resign(0), resign(1), rematch)),
                 **game_fields,
+            }
+        },
+        # Private list of people you've played; each entry must point at a game you both played.
+        "users": {
+            "$uid": {
+                ".read": "auth.uid == $uid",
+                "opponents": {
+                    "$opp": {
+                        ".write": "auth.uid == $uid",
+                        ".validate": AND(
+                            "newData.hasChildren(['last', 'gameId'])",
+                            f"{N('last')} == now",
+                            OR(AND(f"root.child('games/' + {N('gameId')} + '/host').val() == $uid",
+                                   f"root.child('games/' + {N('gameId')} + '/guest').val() == $opp"),
+                               AND(f"root.child('games/' + {N('gameId')} + '/host').val() == $opp",
+                                   f"root.child('games/' + {N('gameId')} + '/guest').val() == $uid")),
+                        ),
+                        "name": str_field(20),
+                        "gameId": str_field(8),
+                        "last": num_field,
+                        "w": num_field, "d": num_field, "l": num_field,
+                        "$other": {".validate": False},
+                    }
+                },
+            }
+        },
+        # Online-now flag, readable by signed-in players.
+        "status": {
+            "$uid": {
+                ".read": "auth != null",
+                ".write": "auth.uid == $uid",
+                ".validate": "newData.isBoolean()",
+            }
+        },
+        # Challenges and rematch requests. Only to people you've played, only for a waiting game
+        # you host that names them as invitee. Recipient or sender may delete (decline / cancel).
+        "inbox": {
+            "$to": {
+                ".read": "auth.uid == $to",
+                "$gid": {
+                    ".read": "auth.uid == $to || data.child('from').val() == auth.uid",
+                    ".write": "auth != null && (auth.uid == $to || data.child('from').val() == auth.uid || (!data.exists() && newData.child('from').val() == auth.uid))",
+                    ".validate": AND(
+                        f"{N('from')} == auth.uid",
+                        "root.child('users/' + auth.uid + '/opponents/' + $to).exists()",
+                        "root.child('games/' + $gid + '/host').val() == auth.uid",
+                        "root.child('games/' + $gid + '/invitee').val() == $to",
+                        "root.child('games/' + $gid + '/status').val() == 'waiting'",
+                        f"{N('at')} == now",
+                        OR(f"{N('kind')} == 'challenge'", f"{N('kind')} == 'rematch'"),
+                    ),
+                    "from": str_field(128),
+                    "fromName": str_field(20),
+                    "kind": str_field(10),
+                    "base": num_field, "inc": num_field, "at": num_field,
+                    "$other": {".validate": False},
+                }
             }
         },
         "presence": {

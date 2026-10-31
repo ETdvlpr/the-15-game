@@ -33,6 +33,7 @@
     </div>
     <div class="top-actions">
       <span class="streak" id="streak" hidden></span>
+      <button class="icon-btn" id="muteBtn" aria-label="Mute sounds">🔊</button>
       <button class="icon-btn" id="helpBtn" aria-label="How to play">?</button>
     </div>
   </header>
@@ -72,8 +73,8 @@
     <div class="row">
       <div class="seg" id="modeSeg">
         <button data-mode="ai" aria-pressed="true">vs AI</button>
-        <button data-mode="local" aria-pressed="false">2 Players</button>
-        <button data-mode="online" aria-pressed="false">Online</button>
+        <button data-mode="local" aria-pressed="false">Pass &amp; play</button>
+        <button data-mode="online" aria-pressed="false">Live match</button>
       </div>
       <label class="switch" id="hintsSwitch"><input type="checkbox" id="hints"> Hints</label>
     </div>
@@ -95,9 +96,6 @@
     <p id="resText"></p>
     <div class="eq" id="resEq"></div>
     <div class="stats" id="resStats"></div>
-    <div class="rematch-offer" id="rmOffer" role="status" hidden>
-      <span class="icon">🔁</span><span><b id="rmOfferName"></b> wants a rematch!</span>
-    </div>
     <div class="rematch-wait" id="rmWait" role="status" hidden>
       <div class="row-line"><span class="ring"></span><span id="rmWaitText"></span></div>
       <div class="left" id="rmLeft" hidden><span id="rmLeftText"></span><button class="link-btn" id="rmCopy">Copy the link</button></div>
@@ -145,14 +143,15 @@
       </div>
       <button class="btn primary full" id="olCreateBtn">Create challenge link</button>
       <p class="notice" id="olCreateNotice" role="alert" hidden></p>
+      <div class="friends" id="olFriends" hidden></div>
     </div>
     <div id="olLoading" hidden>
       <div class="loading-block"><span class="spinner"></span>Connecting to the game…</div>
     </div>
     <div id="olWaiting" hidden>
       <div class="big-emoji">🔗</div>
-      <h2>Send this link</h2>
-      <p>The clock starts when your opponent accepts. Keep this page open.</p>
+      <h2 id="olWaitTitle">Send this link</h2>
+      <p id="olWaitText">The clock starts when your opponent accepts. Keep this page open.</p>
       <div class="linkbox"><input class="input" id="olLink" readonly aria-label="Challenge link"><button class="btn ghost small" id="olCopy">Copy</button></div>
       <button class="btn primary full" id="olShare">Share challenge</button>
       <p class="waiting-line"><span class="dots">Waiting for your opponent</span></p>
@@ -180,9 +179,16 @@
   </div>
 </div>
 
-<div class="rematch-bar" id="rematchBar" role="status" hidden>
-  <span>🔁 <b id="rematchBarName"></b> wants a rematch</span>
-  <button class="btn primary small" id="rematchBarBtn">Accept</button>
+<div class="backdrop invite-pop" id="invitePop" hidden>
+  <div class="sheet" role="alertdialog" aria-modal="true" aria-labelledby="ipTitle" aria-describedby="ipText">
+    <div class="big-emoji" id="ipEmoji">⚔️</div>
+    <h2 id="ipTitle"></h2>
+    <p id="ipText"></p>
+    <div class="sheet-actions" style="margin-top:20px">
+      <button class="btn ghost" id="ipDecline">Decline</button>
+      <button class="btn primary glow" id="ipAccept">Accept</button>
+    </div>
+  </div>
 </div>
 
 <div class="countdown" id="countdown" hidden></div>

@@ -1,4 +1,4 @@
-import type { Game, Seat } from "./types";
+import type { Game } from "./types";
 
 // The web config is public by design; database.rules.json controls access.
 const CONFIG = {
@@ -22,9 +22,11 @@ export interface Backend {
   createGame(id: string, g: GameWrite): Promise<void>;
   updateGame(id: string, patch: GameWrite): Promise<void>;
   watchConnected(cb: (connected: boolean) => void): Unsub;
-  /** Marks this seat present while connected; returns a function that marks it gone. */
-  announce(id: string, seat: Seat): Unsub;
-  watchPresence(id: string, seat: Seat, cb: (online: boolean | null) => void): Unsub;
+  /** Sets `path` to true while connected (false on disconnect); returns a function that clears it. */
+  announce(path: string): Unsub;
+  watch<T = unknown>(path: string, cb: (value: T | null) => void): Unsub;
+  write(path: string, value: unknown): Promise<void>;
+  remove(path: string): Promise<void>;
 }
 
 let pending: Promise<Backend> | null = null;
@@ -60,8 +62,8 @@ async function init(): Promise<Backend> {
     createGame: (id, g) => db.set(gameRef(id), g),
     updateGame: (id, patch) => db.update(gameRef(id), patch),
     watchConnected,
-    announce(id, seat) {
-      const mine = db.ref(database, `presence/${id}/${seat}`);
+    announce(path) {
+      const mine = db.ref(database, path);
       const off = watchConnected(c => {
         if (!c) return;
         db.onDisconnect(mine).set(false);
@@ -73,6 +75,8 @@ async function init(): Promise<Backend> {
         db.set(mine, false).catch(() => {});
       };
     },
-    watchPresence: (id, seat, cb) => db.onValue(db.ref(database, `presence/${id}/${seat}`), s => cb(s.val())),
+    watch: (path, cb) => db.onValue(db.ref(database, path), s => cb(s.val()), () => cb(null)),
+    write: (path, value) => db.set(db.ref(database, path), value),
+    remove: path => db.remove(db.ref(database, path)),
   };
 }

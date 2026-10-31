@@ -6,6 +6,8 @@ export interface Game {
   guest?: string;
   hostName?: string;
   guestName?: string;
+  /** Set on direct challenges: only this player may join. */
+  invitee?: string;
   base: number;
   inc: number;
   starter: Seat;
