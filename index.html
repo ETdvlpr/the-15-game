@@ -6,6 +6,11 @@
 <title>The 15-Game — can you beat the AI?</title>
 <meta name="description" content="Take turns claiming numbers 1–9. First to hold three that add up to exactly 15 wins. Simple to learn, surprisingly hard to master.">
 <meta name="theme-color" content="#0e1320">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="15-Game">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 
 <meta property="og:type" content="website">
 <meta property="og:title" content="The 15-Game — can you beat the AI?">
@@ -33,6 +38,7 @@
     </div>
     <div class="top-actions">
       <span class="streak" id="streak" hidden></span>
+      <button class="pill-btn" id="installBtn" hidden>Install</button>
       <button class="icon-btn" id="muteBtn" aria-label="Mute sounds">🔊</button>
       <button class="icon-btn" id="helpBtn" aria-label="How to play">?</button>
     </div>
@@ -99,6 +105,7 @@
       <div class="left" id="rmLeft" hidden><span id="rmLeftText"></span><button class="link-btn" id="rmCopy">Copy the link</button></div>
     </div>
     <p class="notice" id="resNotice" role="alert" hidden></p>
+    <div class="push-row" id="resPush" hidden></div>
     <div class="sheet-actions">
       <button class="btn ghost" id="shareBtn">Share result</button>
       <button class="btn primary" id="againBtn">Play again</button>
@@ -145,6 +152,7 @@
       <button class="btn primary full" id="olCreateBtn">Create challenge link</button>
       <p class="notice" id="olCreateNotice" role="alert" hidden></p>
       <div class="friends" id="olFriends" hidden></div>
+      <div class="push-row" id="olPush" hidden></div>
     </div>
     <div id="olLoading" hidden>
       <div class="loading-block"><span class="spinner"></span>Connecting to the game…</div>
@@ -192,6 +200,20 @@
       <button class="btn ghost" id="ipDecline">Decline</button>
       <button class="btn primary glow" id="ipAccept">Accept</button>
     </div>
+  </div>
+</div>
+
+<div class="backdrop" id="installSheet" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="installTitle">
+    <img class="install-icon" src="/icons/icon-192.png" alt="" width="72" height="72">
+    <h2 id="installTitle">Install The 15-Game</h2>
+    <p>Play full-screen, play the AI offline, and get notified when friends challenge you.</p>
+    <ul class="rules">
+      <li><span>1</span><span>In Safari, tap the <b>Share</b> button (the square with an arrow).</span></li>
+      <li><span>2</span><span>Choose <b>Add to Home Screen</b>.</span></li>
+      <li><span>3</span><span>Open The 15-Game from your home screen and turn on notifications in <b>Live match</b>.</span></li>
+    </ul>
+    <button class="btn primary full" id="installClose">Got it</button>
   </div>
 </div>
 

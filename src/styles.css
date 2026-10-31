@@ -481,3 +481,19 @@ button { font: inherit; color: inherit; }
   .card .num { font-size: clamp(28px, calc((100dvh - 445px) * .19), 44px); }
   .controls { padding-top: 8px; }
 }
+
+/* Install + notifications */
+.pill-btn {
+  border: 1px solid rgba(255,207,92,.45); background: rgba(255,207,92,.12); color: var(--gold);
+  font-weight: 700; font-size: 13px; padding: 7px 12px; border-radius: 999px; cursor: pointer;
+}
+.pill-btn[hidden] { display: none; }
+.push-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  margin-top: 14px; padding: 10px 12px; border-radius: 12px; text-align: left;
+  background: var(--panel); border: 1px solid var(--line); font-size: 13.5px;
+}
+.push-row[hidden] { display: none; }
+.push-row .muted { color: var(--muted); }
+.push-row .btn { flex: none; }
+.install-icon { border-radius: 18px; box-shadow: 0 8px 24px rgba(0,0,0,.4); }

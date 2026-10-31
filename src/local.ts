@@ -2,7 +2,7 @@ import { createStore } from "./store";
 import { aiChoose, findLine, freeCards, type Difficulty, type Hands } from "./game/logic";
 
 export type Mode = "ai" | "local" | "online";
-export type Sheet = "help" | "result" | "online" | null;
+export type Sheet = "help" | "result" | "online" | "install" | null;
 export type Side = 0 | 1;
 
 export interface LocalGame {

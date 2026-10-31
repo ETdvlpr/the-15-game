@@ -14,6 +14,8 @@ export type GameWrite = Partial<Record<keyof Game, unknown>>;
 
 export interface Backend {
   uid: string;
+  /** A fresh Firebase ID token, for calls to our own API. */
+  idToken(): Promise<string>;
   /** Best estimate of the server clock. */
   now(): number;
   serverTime: object;
@@ -55,6 +57,7 @@ async function init(): Promise<Backend> {
 
   return {
     uid: user.uid,
+    idToken: () => user.getIdToken(),
     now: () => Date.now() + offset,
     serverTime: db.serverTimestamp(),
     watchGame: (id, onData, onError) => db.onValue(gameRef(id), s => onData(s.val()), onError),

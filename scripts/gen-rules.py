@@ -179,6 +179,23 @@ rules = {
                 }
             }
         },
+        # Web Push subscriptions. Readable by you and by people you've played (the /api/notify
+        # function reads them with the sender's credentials); sending also needs our VAPID key.
+        "push": {
+            "$uid": {
+                ".read": "auth.uid == $uid || root.child('users/' + $uid + '/opponents/' + auth.uid).exists()",
+                "$sub": {
+                    ".write": "auth.uid == $uid",
+                    ".validate": AND("newData.hasChildren(['endpoint', 'p256dh', 'auth', 'at'])",
+                                     "$sub.matches(/^[a-f0-9]{24}$/)", f"{N('at')} == now"),
+                    "endpoint": {".validate": "newData.isString() && newData.val().beginsWith('https://') && newData.val().length <= 1000"},
+                    "p256dh": str_field(200),
+                    "auth": str_field(100),
+                    "at": num_field,
+                    "$other": {".validate": False},
+                }
+            }
+        },
         "presence": {
             "$gid": {
                 ".read": True,

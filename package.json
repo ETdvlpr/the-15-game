@@ -10,7 +10,8 @@
     "rules": "python3 scripts/gen-rules.py"
   },
   "dependencies": {
-    "firebase": "12.19.0"
+    "firebase": "12.19.0",
+    "web-push": "^3.6.7"
   },
   "devDependencies": {
     "typescript": "5.9.3",

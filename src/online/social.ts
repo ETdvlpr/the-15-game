@@ -1,5 +1,6 @@
 import { createStore } from "../store";
 import { connect, type Backend, type Unsub } from "./firebase";
+import { notify, refreshPush } from "./push";
 import type { Game, Seat, TimeControl } from "./types";
 
 /** Someone you've played, from your private /users/{you}/opponents list. */
@@ -49,6 +50,7 @@ export function startSocial(): Promise<void> {
     backend = b;
     const me = b.uid;
     b.announce(`status/${me}`);
+    refreshPush();
     b.watch<Record<string, Omit<Opponent, "uid">>>(`users/${me}/opponents`, v => {
       const opponents = Object.entries(v ?? {})
         .map(([uid, o]) => ({ uid, name: o.name ?? "", last: o.last ?? 0, gameId: o.gameId, w: o.w ?? 0, d: o.d ?? 0, l: o.l ?? 0 }))
@@ -91,7 +93,7 @@ export function sendInvite(to: string, gid: string, kind: Invite["kind"], tc: Ti
   if (!backend) return Promise.reject(new Error("offline"));
   const inv: Record<string, unknown> = { from: backend.uid, kind, base: tc.base, inc: tc.inc, at: backend.serverTime };
   if (fromName) inv.fromName = fromName;
-  return backend.write(`inbox/${to}/${gid}`, inv);
+  return backend.write(`inbox/${to}/${gid}`, inv).then(() => void notify(to, gid));
 }
 
 /** Calls onGone once the invite is removed (declined, accepted or expired). */

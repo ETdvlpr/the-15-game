@@ -148,6 +148,30 @@
         }
       }
     },
+    "push": {
+      "$uid": {
+        ".read": "auth.uid == $uid || root.child('users/' + $uid + '/opponents/' + auth.uid).exists()",
+        "$sub": {
+          ".write": "auth.uid == $uid",
+          ".validate": "(newData.hasChildren(['endpoint', 'p256dh', 'auth', 'at']) && $sub.matches(/^[a-f0-9]{24}$/) && newData.child('at').val() == now)",
+          "endpoint": {
+            ".validate": "newData.isString() && newData.val().beginsWith('https://') && newData.val().length <= 1000"
+          },
+          "p256dh": {
+            ".validate": "newData.isString() && newData.val().length <= 200"
+          },
+          "auth": {
+            ".validate": "newData.isString() && newData.val().length <= 100"
+          },
+          "at": {
+            ".validate": "newData.isNumber()"
+          },
+          "$other": {
+            ".validate": false
+          }
+        }
+      }
+    },
     "presence": {
       "$gid": {
         ".read": true,

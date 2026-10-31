@@ -2,6 +2,7 @@ import { app, loadStats, newGame, setMode } from "../local";
 import { tcLabel } from "../online/clock";
 import { acceptInvite, match, requestRematch, resign, shown, shownOpponent, type MatchState } from "../online/match";
 import { social, type Invite, type Opponent } from "../online/social";
+import { pushState } from "../online/push";
 import { boardView, DIFF, onlineNames } from "../view";
 import { $ } from "./dom";
 
@@ -115,6 +116,7 @@ let lastPart: string | null = null;
 export function renderSheets() {
   const a = app.get(), m = match.get(), online = a.mode === "online";
   $("helpSheet").hidden = a.sheet !== "help";
+  $("installSheet").hidden = a.sheet !== "install";
   $("resultSheet").hidden = a.sheet !== "result";
   const part = online && a.sheet === "online" ? onlinePart(m) : null;
   $("onlineSheet").hidden = part === null;
@@ -187,6 +189,7 @@ function renderOnlineSheet(m: MatchState, part: string) {
     applyAction($("olCreateBtn") as HTMLButtonElement, { label: "Create challenge link", loading: m.busy === "create" && !m.busyFor, disabled: !!m.busy });
     notice("olCreateNotice");
     renderFriends(m);
+    renderPush("olPush", "create");
   }
   if (part === "olWaiting" && m.gameId) {
     $<HTMLInputElement>("olLink").value = gameUrl(m.gameId);
@@ -247,7 +250,7 @@ function renderLocalResult() {
   const stats = loadStats(), d = stats[diff] ?? { w: 0, d: 0, l: 0 };
   $("resStats").hidden = !ai;
   $("resStats").innerHTML = `<div class="stat"><b>${d.w}</b><span>Won</span></div><div class="stat"><b>${d.d}</b><span>Drawn</span></div><div class="stat"><b>${d.l}</b><span>Lost</span></div><div class="stat"><b>${stats.streak ?? 0}</b><span>Streak</span></div>`;
-  $("rmWait").hidden = $("resNotice").hidden = true;
+  $("rmWait").hidden = $("resNotice").hidden = $("resPush").hidden = true;
   applyAction($("againBtn") as HTMLButtonElement, resultAction());
 }
 
@@ -283,5 +286,21 @@ function renderOnlineResult(m: MatchState) {
   $("rmLeftText").textContent = `${opp} has left the game.`;
   $("resNotice").hidden = !m.notice;
   $("resNotice").textContent = m.notice ?? "";
+  if (spectator) $("resPush").hidden = true;
+  else renderPush("resPush", "result");
   applyAction($("againBtn") as HTMLButtonElement, resultAction());
+}
+
+/** Offers challenge notifications (or explains how to get them) where it makes sense. */
+function renderPush(id: string, where: "create" | "result") {
+  const create = where === "create";
+  const html = {
+    default: `<span>🔔 ${create ? "Get notified when friends challenge you" : "Get notified for rematches and challenges"}</span><button class="btn small primary" data-push="enable">Turn on</button>`,
+    granted: create ? `<span class="muted">🔔 Challenge notifications are on</span>` : "",
+    denied: create ? `<span class="muted">🔕 Notifications are blocked in your browser settings</span>` : "",
+    "needs-install": `<span>📲 Install the app to get challenge notifications</span><button class="btn small ghost" data-push="install">How?</button>`,
+    unsupported: "",
+  }[pushState()];
+  $(id).hidden = !html;
+  if ($(id).innerHTML !== html) $(id).innerHTML = html;
 }

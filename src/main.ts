@@ -16,6 +16,7 @@ import {
 import { $, confetti, copy, share, shake, toast } from "./ui/dom";
 import { emojiGrid, renderShareImage } from "./ui/shareImage";
 import { isMuted, setMuted, sfx, unlockAudio } from "./ui/sound";
+import { enablePush, isIOS, isStandalone } from "./online/push";
 import type { Difficulty } from "./game/logic";
 
 // ---------- Rendering: everything is derived from the stores ----------
@@ -259,7 +260,39 @@ const syncMute = () => {
 };
 $("muteBtn").onclick = () => { setMuted(!isMuted()); syncMute(); if (!isMuted()) sfx.pick(); };
 syncMute();
-for (const id of ["helpSheet", "resultSheet", "onlineSheet"]) {
+// ---------- Install + notifications ----------
+type InstallPrompt = Event & { prompt(): Promise<void>; userChoice: Promise<unknown> };
+let installPrompt: InstallPrompt | null = null;
+const syncInstall = () => { $("installBtn").hidden = isStandalone() || !(installPrompt || isIOS()); };
+window.addEventListener("beforeinstallprompt", e => {
+  e.preventDefault(); // show our own button instead of the browser's mini-infobar
+  installPrompt = e as InstallPrompt;
+  syncInstall();
+});
+window.addEventListener("appinstalled", () => { installPrompt = null; syncInstall(); toast("Installed — find it on your home screen"); });
+$("installBtn").onclick = async () => {
+  if (!installPrompt) return app.set({ sheet: "install" }); // iOS: explain Add to Home Screen
+  await installPrompt.prompt();
+  await installPrompt.userChoice;
+  installPrompt = null;
+  syncInstall();
+};
+$("installClose").onclick = closeSheet;
+syncInstall();
+document.addEventListener("click", async e => {
+  const act = (e.target as HTMLElement).closest<HTMLElement>("[data-push]")?.dataset.push;
+  if (act === "install") return app.set({ sheet: "install" });
+  if (act !== "enable") return;
+  await startSocial().catch(() => {});
+  const state = await enablePush();
+  toast(state === "granted" ? "🔔 You'll be notified when someone challenges you" : "Notifications weren't turned on");
+  render();
+});
+if ("serviceWorker" in navigator && import.meta.env.PROD) {
+  window.addEventListener("load", () => void navigator.serviceWorker.register("/sw.js").catch(() => {}));
+}
+
+for (const id of ["helpSheet", "resultSheet", "onlineSheet", "installSheet"]) {
   $(id).addEventListener("click", e => { if ((e.target as HTMLElement).id === id) closeSheet(); });
 }
 document.addEventListener("keydown", e => {
