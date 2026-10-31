@@ -104,7 +104,7 @@ social.subscribe(s => resolveRematchRace(s.incoming, savedName()));
 matchEvents.addEventListener("rejected", e => {
   shake(cardEl((e as CustomEvent<number>).detail));
   sfx.error();
-  toast("Move rejected — your time ran out");
+  toast("Move rejected: your time ran out");
 });
 matchEvents.addEventListener("error", e => toast((e as CustomEvent<string>).detail));
 
@@ -269,7 +269,7 @@ window.addEventListener("beforeinstallprompt", e => {
   installPrompt = e as InstallPrompt;
   syncInstall();
 });
-window.addEventListener("appinstalled", () => { installPrompt = null; syncInstall(); toast("Installed — find it on your home screen"); });
+window.addEventListener("appinstalled", () => { installPrompt = null; syncInstall(); toast("Installed! Find it on your home screen"); });
 $("installBtn").onclick = async () => {
   if (!installPrompt) return app.set({ sheet: "install" }); // iOS: explain Add to Home Screen
   await installPrompt.prompt();

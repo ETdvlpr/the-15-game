@@ -33,9 +33,9 @@ export async function share(text: string) {
   try {
     if (navigator.share) return void await navigator.share({ text });
     await navigator.clipboard.writeText(text);
-    toast("Copied — paste it anywhere");
+    toast("Copied! Paste it anywhere");
   } catch (e) {
-    if ((e as Error)?.name !== "AbortError") toast("Couldn't share — try copying the URL");
+    if ((e as Error)?.name !== "AbortError") toast("Couldn't share. Try copying the URL");
   }
 }
 
@@ -44,7 +44,7 @@ export async function copy(text: string, done = "Copied") {
     await navigator.clipboard.writeText(text);
     toast(done);
   } catch {
-    toast("Couldn't copy — long-press the link instead");
+    toast("Couldn't copy. Long-press the link instead");
   }
 }
 

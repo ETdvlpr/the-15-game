@@ -244,7 +244,7 @@ function renderLocalResult() {
   const { mode, diff, game: g } = app.get(), ai = mode === "ai";
   if (g.winner === null) setResult("🤝", "Draw", ai && diff === "hard" ? "You held the unbeatable AI. That's the best anyone can do." : "Every card gone, no 15. Evenly matched.", null);
   else if (ai && g.winner === 0) setResult("🏆", "You win!", `Beat the ${DIFF[diff].label} AI in ${g.hands[0].length} picks.`, g.line);
-  else if (ai) setResult("🤖", "AI wins", diff === "easy" ? "Even the casual AI got you. Rematch?" : "Watch for forks — two threats at once.", g.line);
+  else if (ai) setResult("🤖", "AI wins", diff === "easy" ? "Even the casual AI got you. Rematch?" : "Watch for forks: two threats at once.", g.line);
   else setResult("🏆", `Player ${g.winner + 1} wins!`, `Won in ${g.hands[g.winner].length} picks.`, g.line);
 
   const stats = loadStats(), d = stats[diff] ?? { w: 0, d: 0, l: 0 };

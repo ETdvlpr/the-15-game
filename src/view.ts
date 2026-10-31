@@ -68,9 +68,9 @@ function localView(): BoardView {
   const status = g.over
     ? (g.winner === null ? "It's a draw" : hl(g.winner, g.winner === 0 && ai ? "You win!" : `${names[g.winner]} wins`)) + seeResult()
     : g.thinking ? dots("AI is thinking", "hl-ai")
-    : ai && lastMove?.side === 1 ? `AI took <b>${lastMove.n}</b> — ${hl(0, "your turn")}`
-    : ai ? `${hl(0, g.hands[0].length ? "Your turn" : "You go first")} — pick a card`
-    : `${hl(g.turn, names[g.turn])} — your turn`;
+    : ai && lastMove?.side === 1 ? `AI took <b>${lastMove.n}</b>, ${hl(0, "your turn")}`
+    : ai ? `${hl(0, g.hands[0].length ? "Your turn" : "You go first")}: pick a card`
+    : `${hl(g.turn, names[g.turn])}, your turn`;
   return {
     key: `local-${g.id}`,
     hands: g.hands,
@@ -126,7 +126,7 @@ function onlineView(): BoardView {
     case "playing":
       status = countdownLeft(g!, serverNow()) > 0 ? "Get ready…"
         : spectator ? `${hl(turn, esc(names[turn]))} to move · watching`
-        : turn === 0 ? (lastMove?.side === 1 ? `${opponent} took <b>${lastMove.n}</b> — ${hl(0, "your move")}` : `${hl(0, "Your move")} — the clock is running`)
+        : turn === 0 ? (lastMove?.side === 1 ? `${opponent} took <b>${lastMove.n}</b>, ${hl(0, "your move")}` : `${hl(0, "Your move")}, the clock is running`)
         : dots(`${opponent} is thinking`, "hl-ai");
   }
 
