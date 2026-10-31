@@ -7,7 +7,18 @@ Play at https://the-15-game.vercel.app
 - Play against an Easy, Medium or Hard (unbeatable) AI, or pass-and-play with a friend
 - **Online:** send a challenge link for a live, timed match (15s+1, 30s+2 or 60s+3 per player)
 - Optional hints show winning and blocking moves
-- Single static `index.html`, no build step
+
+## Development
+
+```sh
+npm install
+npm run dev      # local dev server
+npm run build    # type-check + production build to dist/
+```
+
+Code layout: `src/game` (rules + AI), `src/local.ts` (offline game state), `src/online` (Firebase
+wrapper, clock maths and the match state machine in `match.ts`), `src/view.ts` (derives what the
+board shows) and `src/ui` (DOM rendering). All rendering is derived from two small stores.
 
 ## Online play
 
