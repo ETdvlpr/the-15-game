@@ -121,7 +121,7 @@
       "$to": {
         ".read": "auth.uid == $to",
         "$gid": {
-          ".read": "auth.uid == $to || data.child('from').val() == auth.uid",
+          ".read": "auth != null && (auth.uid == $to || (data.exists() && data.child('from').val() == auth.uid))",
           ".write": "auth != null && (auth.uid == $to || data.child('from').val() == auth.uid || (!data.exists() && newData.child('from').val() == auth.uid))",
           ".validate": "(newData.child('from').val() == auth.uid && root.child('users/' + auth.uid + '/opponents/' + $to).exists() && root.child('games/' + $gid + '/host').val() == auth.uid && root.child('games/' + $gid + '/invitee').val() == $to && root.child('games/' + $gid + '/status').val() == 'waiting' && newData.child('at').val() == now && (newData.child('kind').val() == 'challenge' || newData.child('kind').val() == 'rematch'))",
           "from": {

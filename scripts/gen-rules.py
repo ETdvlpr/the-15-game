@@ -160,7 +160,7 @@ rules = {
             "$to": {
                 ".read": "auth.uid == $to",
                 "$gid": {
-                    ".read": "auth.uid == $to || data.child('from').val() == auth.uid",
+                    ".read": "auth != null && (auth.uid == $to || (data.exists() && data.child('from').val() == auth.uid))",
                     ".write": "auth != null && (auth.uid == $to || data.child('from').val() == auth.uid || (!data.exists() && newData.child('from').val() == auth.uid))",
                     ".validate": AND(
                         f"{N('from')} == auth.uid",
