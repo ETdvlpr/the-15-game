@@ -229,6 +229,7 @@
   .seg button[aria-pressed="true"] { background: var(--text); color: var(--bg); font-weight: 700; }
   .seg[hidden] { display: none; }
   .switch { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px; color: var(--muted); user-select: none; }
+  .switch[hidden] { display: none; }
   .switch input { appearance: none; width: 36px; height: 20px; border-radius: 999px; background: var(--line); position: relative; cursor: pointer; transition: background .2s; margin: 0; }
   .switch input::after { content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: var(--text); transition: transform .2s; }
   .switch input:checked { background: var(--you); }
@@ -298,6 +299,47 @@
 
   .confetti { position: fixed; top: -12px; width: 8px; height: 12px; z-index: 25; pointer-events: none; animation: fall linear forwards; }
 
+  /* ---------- Online ---------- */
+  .clock {
+    min-width: 66px; padding: 5px 10px; border-radius: 9px;
+    text-align: center; font-weight: 700; font-size: 18px;
+    font-variant-numeric: tabular-nums;
+    background: var(--panel); border: 1px solid var(--line); color: var(--muted);
+    transition: background .2s, color .2s;
+  }
+  .clock[hidden] { display: none; }
+  .player.active .clock { background: var(--c); border-color: var(--c); color: var(--bg); }
+  .player.active .clock.low { background: #ff4d4d; border-color: #ff4d4d; color: #fff; animation: pulse .5s ease-in-out infinite alternate; }
+  .presence { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--muted); margin-right: 5px; vertical-align: 1px; }
+  .presence.on { background: var(--you); }
+
+  .countdown {
+    position: fixed; inset: 0; z-index: 15; pointer-events: none;
+    display: grid; place-items: center;
+    font: 800 140px "Fraunces", serif; color: var(--gold);
+    text-shadow: 0 10px 40px rgba(0,0,0,.6);
+    background: radial-gradient(circle at center, rgba(14,19,32,.85) 0, rgba(14,19,32,.6) 110px, transparent 200px);
+  }
+  .countdown[hidden] { display: none; }
+  .countdown span { animation: pop .4s cubic-bezier(.2,1.6,.4,1); }
+
+  .stack { display: grid; gap: 8px; text-align: left; margin: 18px 0; }
+  .label { font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
+  .input {
+    width: 100%; padding: 12px 14px; border-radius: 12px;
+    border: 1px solid var(--line); background: var(--bg); color: var(--text);
+    font: inherit; font-size: 16px;
+  }
+  .input:focus { outline: 2px solid var(--gold); outline-offset: 1px; }
+  .seg.wide { display: flex; }
+  .seg.wide button { flex: 1; }
+  .btn.full { width: 100%; }
+  .btn.danger { background: rgba(255,77,77,.12); border: 1px solid rgba(255,77,77,.4); color: #ff8a8a; }
+  .linkbox { display: flex; gap: 8px; margin: 18px 0 10px; }
+  .linkbox .input { font-size: 14px; color: var(--muted); }
+  .waiting-line { margin-top: 14px !important; font-size: 14px; }
+
+  @keyframes pulse { to { transform: scale(1.08); } }
   @keyframes pop { from { transform: scale(.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }
   @keyframes take { from { transform: scale(1.06); } to { transform: scale(1); } }
   @keyframes bounce { 0%,100% { transform: translateY(0); } 40% { transform: translateY(-10px); } 70% { transform: translateY(2px); } }
@@ -333,6 +375,7 @@
         <div class="sub" id="sub1"></div>
       </div>
       <div class="needs" id="needs1"></div>
+      <div class="clock" id="clock1" hidden></div>
     </div>
     <div class="hand" id="hand1"></div>
   </section>
@@ -349,6 +392,7 @@
         <div class="sub" id="sub0"></div>
       </div>
       <div class="needs" id="needs0"></div>
+      <div class="clock" id="clock0" hidden></div>
     </div>
     <div class="hand" id="hand0"></div>
   </section>
@@ -358,8 +402,9 @@
       <div class="seg" id="modeSeg">
         <button data-mode="ai" aria-pressed="true">vs AI</button>
         <button data-mode="local" aria-pressed="false">2 Players</button>
+        <button data-mode="online" aria-pressed="false">Online</button>
       </div>
-      <label class="switch"><input type="checkbox" id="hints"> Hints</label>
+      <label class="switch" id="hintsSwitch"><input type="checkbox" id="hints"> Hints</label>
     </div>
     <div class="row">
       <div class="seg" id="diffSeg">
@@ -403,6 +448,55 @@
   </div>
 </div>
 
+<div class="backdrop" id="onlineSheet" hidden>
+  <div class="sheet" role="dialog" aria-modal="true">
+    <div id="olCreate">
+      <div class="big-emoji">⚡</div>
+      <h2>Live match</h2>
+      <p>Challenge a friend to a timed game. Run out of time and you lose.</p>
+      <div class="stack">
+        <label class="label" for="olName">Your name</label>
+        <input class="input" id="olName" maxlength="20" placeholder="So they know who's challenging" autocomplete="nickname">
+        <span class="label">Time per player</span>
+        <div class="seg wide" id="tcSeg">
+          <button data-base="15000" data-inc="1000" aria-pressed="false">15s +1</button>
+          <button data-base="30000" data-inc="2000" aria-pressed="true">30s +2</button>
+          <button data-base="60000" data-inc="3000" aria-pressed="false">60s +3</button>
+        </div>
+      </div>
+      <button class="btn primary full" id="olCreateBtn">Create challenge link</button>
+    </div>
+    <div id="olWaiting" hidden>
+      <div class="big-emoji">🔗</div>
+      <h2 id="olWaitTitle">Send this link</h2>
+      <p>The clock starts when your opponent accepts. Keep this page open.</p>
+      <div class="linkbox"><input class="input" id="olLink" readonly aria-label="Challenge link"><button class="btn ghost small" id="olCopy">Copy</button></div>
+      <button class="btn primary full" id="olShare">Share challenge</button>
+      <p class="waiting-line"><span class="dots">Waiting for your opponent</span></p>
+    </div>
+    <div id="olInvite" hidden>
+      <div class="big-emoji">⚔️</div>
+      <h2 id="olInviteTitle">You've been challenged</h2>
+      <p id="olInviteText"></p>
+      <div class="stack">
+        <label class="label" for="olName2">Your name</label>
+        <input class="input" id="olName2" maxlength="20" placeholder="Optional" autocomplete="nickname">
+      </div>
+      <button class="btn primary full" id="olAccept">Accept &amp; play</button>
+    </div>
+    <div id="olMsg" hidden>
+      <div class="big-emoji" id="olMsgEmoji">🤷</div>
+      <h2 id="olMsgTitle"></h2>
+      <p id="olMsgText"></p>
+      <div class="sheet-actions" style="margin-top:20px">
+        <button class="btn ghost" id="olMsgAi">Play vs AI</button>
+        <button class="btn primary" id="olMsgNew">New challenge</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="countdown" id="countdown" hidden></div>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -472,7 +566,7 @@
   };
   const available = () => [1,2,3,4,5,6,7,8,9].filter(n => !state.hands[0].includes(n) && !state.hands[1].includes(n));
   const owner = n => state.hands[0].includes(n) ? 0 : state.hands[1].includes(n) ? 1 : null;
-  const names = () => state.mode === "ai" ? ["You", "AI"] : ["Player 1", "Player 2"];
+  const names = () => state.mode === "ai" ? ["You", "AI"] : state.mode === "online" ? onlineNames() : ["Player 1", "Player 2"];
 
   // ---------- Stats (per-viewer convenience only) ----------
   function loadStats() {
@@ -510,14 +604,22 @@
   function render() {
     const avail = available();
     const [n0, n1] = names();
-    const waiting = state.over || state.thinking || (state.mode === "ai" && state.turn === 1);
+    const isOnline = state.mode === "online", g = online.g;
+    const waiting = isOnline ? !canMoveOnline() : state.over || state.thinking || (state.mode === "ai" && state.turn === 1);
 
     // Players
     $("name0").textContent = n0; $("name1").textContent = n1;
-    $("avatar0").textContent = state.mode === "ai" ? "You" : "P1";
-    $("avatar1").textContent = state.mode === "ai" ? "AI" : "P2";
-    $("sub1").textContent = state.mode === "ai" ? DIFF[state.diff].persona : "";
+    const avatar = p => state.mode === "ai" ? ["You", "AI"][p]
+      : isOnline && online.seat !== null ? (p === 0 ? "You" : n1[0].toUpperCase()) : ["P1", "P2"][p];
+    $("avatar0").textContent = avatar(0);
+    $("avatar1").textContent = avatar(1);
     $("sub0").textContent = "";
+    if (state.mode === "ai") $("sub1").textContent = DIFF[state.diff].persona;
+    else if (isOnline && g && g.status !== "waiting") {
+      const dot = online.seat === null || online.oppOnline === null ? ""
+        : `<span class="presence ${online.oppOnline ? "on" : ""}"></span>${online.oppOnline ? "online" : "offline"} · `;
+      $("sub1").innerHTML = dot + tcLabel(g);
+    } else $("sub1").textContent = "";
     for (const p of [0, 1]) {
       $("panel" + p).classList.toggle("active", !state.over && state.turn === p);
       const hand = $("hand" + p);
@@ -556,8 +658,15 @@
     // Status
     const s = $("status");
     const cls = p => (p === 0 ? "hl-you" : "hl-ai");
+    const meWon = state.winner === 0 && (state.mode === "ai" || (isOnline && online.seat !== null));
     if (state.over) {
-      s.innerHTML = state.winner === null ? "It's a draw" : `<span class="${cls(state.winner)}">${state.winner === 0 && state.mode === "ai" ? "You win!" : names()[state.winner] + " wins"}</span>`;
+      s.innerHTML = state.winner === null ? "It's a draw" : `<span class="${cls(state.winner)}">${meWon ? "You win!" : names()[state.winner] + " wins"}</span>`;
+    } else if (isOnline) {
+      if (!g) s.textContent = online.id ? "Connecting…" : "Create a challenge to play live";
+      else if (g.status === "waiting") s.innerHTML = `<span class="dots">Waiting for an opponent</span>`;
+      else if (inCountdown()) s.textContent = "Get ready…";
+      else if (online.seat === null) s.innerHTML = `<span class="${cls(state.turn)}">${names()[state.turn]}</span> to move · watching`;
+      else s.innerHTML = state.turn === 0 ? `<span class="hl-you">Your move</span> — the clock is running` : `<span class="hl-ai dots">${n1} is thinking</span>`;
     } else if (state.thinking) {
       s.innerHTML = `<span class="hl-ai dots">AI is thinking</span>`;
     } else if (state.mode === "ai") {
@@ -571,12 +680,24 @@
     $("streak").hidden = streak < 2;
     $("streak").textContent = `🔥 ${streak}`;
     $("diffSeg").hidden = state.mode !== "ai";
+    $("hintsSwitch").hidden = isOnline;
+    const nb = $("newBtn");
+    if (!nb.dataset.confirm) {
+      const player = isOnline && g && online.seat !== null;
+      nb.textContent = !isOnline ? "New game"
+        : player && g.status === "waiting" && online.seat === 0 ? "Share link"
+        : player && g.status === "playing" ? "Resign"
+        : player && g.status === "over" ? (g.rematch && g.rematch !== online.rematchMine ? "Accept rematch" : "Rematch")
+        : "New challenge";
+      nb.classList.toggle("danger", nb.textContent === "Resign");
+    }
     document.querySelectorAll("#diffSeg button").forEach(b => b.setAttribute("aria-pressed", b.dataset.diff === state.diff));
     document.querySelectorAll("#modeSeg button").forEach(b => b.setAttribute("aria-pressed", b.dataset.mode === state.mode));
   }
 
   // ---------- Flow ----------
   function newGame() {
+    if (state.mode === "online") return;
     clearTimeout(state.timer);
     Object.assign(state, { hands: [[], []], over: false, thinking: false, winner: null, line: null });
     state.turn = state.nextStarter;
@@ -587,6 +708,7 @@
   }
 
   function humanPick(n) {
+    if (state.mode === "online") return onlineMove(n);
     if (state.over || state.thinking || owner(n) !== null) return;
     if (state.mode === "ai" && state.turn !== 0) return;
     play(n);
@@ -650,6 +772,7 @@
       ? `<div class="stat"><b>${d.w}</b><span>Won</span></div><div class="stat"><b>${d.d}</b><span>Drawn</span></div><div class="stat"><b>${d.l}</b><span>Lost</span></div><div class="stat"><b>${stats.streak || 0}</b><span>Streak</span></div>`
       : "";
     $("resStats").hidden = !ai;
+    $("againBtn").textContent = "Play again";
     $("resultSheet").hidden = false;
     $("againBtn").focus();
   }
@@ -658,6 +781,13 @@
     const url = location.href.split("#")[0];
     const { winner, line, mode, diff } = state;
     const eq = line ? `${line.join(" + ")} = 15` : "";
+    if (mode === "online") {
+      const opp = names()[1], tc = online.g ? ` (${tcLabel(online.g)})` : "", home = location.origin + location.pathname;
+      if (online.seat === null) return `👀 Just watched a live game of The 15-Game${tc}\n${home}`;
+      if (winner === 0) return `🏆 I beat ${opp} in a live game of The 15-Game${tc}${eq ? "\n" + eq : ""}\nThink you're quicker? ${home}`;
+      if (winner === null) return `🤝 Drew ${opp} in a live game of The 15-Game${tc}\n${home}`;
+      return `⏱ ${opp} beat me in a live game of The 15-Game${tc}. Rematch incoming.\n${home}`;
+    }
     if (mode !== "ai") return `Just played The 15-Game — ${names()[winner] ?? "nobody"} ${winner === null ? "won. Draw!" : "won with " + eq}\n${url}`;
     if (winner === 0) return `🏆 I beat the ${DIFF[diff].label} AI at The 15-Game in ${state.hands[0].length} picks\n${eq}\nCan you? ${url}`;
     if (winner === null) return diff === "hard"
@@ -666,8 +796,7 @@
     return `🤖 The ${DIFF[diff].label} AI beat me at The 15-Game\nThink you can do better? ${url}`;
   }
 
-  async function share() {
-    const text = shareText();
+  async function share(text = shareText()) {
     try {
       if (navigator.share) { await navigator.share({ text }); return; }
       await navigator.clipboard.writeText(text);
@@ -702,31 +831,382 @@
     }
   }
 
+  // ---------- Online (Firebase Realtime Database) ----------
+  // The web config is public by design; database.rules.json enforces turns, cards, clocks and results.
+  const FIREBASE = {
+    apiKey: "AIzaSyC9tKXepd8WWiN4cU2DzkffQCHSvp5hyGc",
+    authDomain: "the-15-game-live.firebaseapp.com",
+    databaseURL: "https://the-15-game-live-default-rtdb.firebaseio.com",
+    projectId: "the-15-game-live",
+    appId: "1:39018805752:web:8c78ab7061da624888be0d",
+  };
+  const FB_SDK = "https://www.gstatic.com/firebasejs/12.19.0";
+  const GRACE = 1500, COUNTDOWN = 3000; // must match scripts/gen-rules.py
+  const online = { id: null, g: null, seat: null, oppOnline: null, unsub: [], tc: { base: 30000, inc: 2000 },
+    rematchMine: null, rematchSeen: null, autoJoin: false, claimed: null, lastStatus: null, live: false, pending: false, presence: null };
+  let fb = null;
+
+  async function fbInit() {
+    if (fb) return fb;
+    const [appM, authM, dbM] = await Promise.all(["app", "auth", "database"].map(m => import(`${FB_SDK}/firebase-${m}.js`)));
+    const app = appM.initializeApp(FIREBASE);
+    const auth = authM.getAuth(app);
+    await auth.authStateReady(); // reuse the same anonymous player after a reload
+    const user = auth.currentUser || (await authM.signInAnonymously(auth)).user;
+    const db = dbM.getDatabase(app);
+    let offset = 0;
+    dbM.onValue(dbM.ref(db, ".info/serverTimeOffset"), s => { offset = s.val() || 0; });
+    fb = { ...dbM, db, uid: user.uid, now: () => Date.now() + offset };
+    return fb;
+  }
+
+  const gameRef = id => fb.ref(fb.db, `games/${id}`);
+  const newId = () => Array.from(crypto.getRandomValues(new Uint8Array(8)), b => "abcdefghijklmnopqrstuvwxyz0123456789"[b % 36]).join("");
+  const digits = s => [...(s || "")].map(Number);
+  const gameUrl = id => `${location.origin}${location.pathname}?g=${id}`;
+  const tcLabel = g => `${g.base / 1000}s +${g.inc / 1000}`;
+  function savedName() { try { return localStorage.getItem("pick15-name") || ""; } catch { return ""; } }
+  function saveName(n) { try { localStorage.setItem("pick15-name", n); } catch {} }
+
+  function onlineNames() {
+    const g = online.g;
+    if (!g) return ["You", "Opponent"];
+    if (online.seat === null) return [g.hostName || "Player 1", g.guestName || "Player 2"];
+    return ["You", (online.seat === 0 ? g.guestName : g.hostName) || "Opponent"];
+  }
+
+  // Remaining ms on a seat's clock, mirroring the settlement rule in database.rules.json.
+  function clockMs(g, seat, now) {
+    if (g.status === "over" && g.reason === "time" && g.turn === seat) return 0;
+    let b = g["b" + seat];
+    if (g.owe === seat) b = b - (g.turnAt - g.prevAt) + g.inc;
+    else if (g.status === "playing" && g.turn === seat) b -= now - g.turnAt;
+    return g.owe === -1 ? Math.min(b, g.base) : b; // the first mover's extra 3s covers the countdown
+  }
+  function fmtClock(ms) {
+    ms = Math.max(0, ms);
+    if (ms < 10000) return `0:0${(Math.floor(ms / 100) / 10).toFixed(1)}`;
+    const s = Math.ceil(ms / 1000);
+    return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+  }
+  const inCountdown = () => !!(fb && online.g && online.g.status === "playing" && online.g.owe === -1 && fb.now() < online.g.turnAt + COUNTDOWN);
+  const canMoveOnline = () => {
+    const g = online.g;
+    return !!g && online.seat !== null && g.status === "playing" && g.turn === online.seat && !online.pending && !inCountdown();
+  };
+
+  function applyGame(g) {
+    online.g = g;
+    if (!g) return showOnlineMsg("🤷", "Game not found", "This challenge link doesn't exist.");
+    online.seat = g.host === fb.uid ? 0 : g.guest === fb.uid ? 1 : null;
+    const me = online.seat ?? 0;
+    state.hands = [digits(g["h" + me]), digits(g["h" + (1 - me)])];
+    state.turn = g.turn == null || g.turn === me ? 0 : 1;
+    state.over = g.status === "over";
+    state.winner = !state.over || g.winner === -1 ? null : g.winner === me ? 0 : 1;
+    state.line = state.winner === null ? null : findLine(state.hands[state.winner]) || null;
+
+    if (g.status === "waiting") {
+      if (online.seat === 0) showWaiting();
+      else if (online.autoJoin) { online.autoJoin = false; acceptChallenge(); }
+      else showInvite(g);
+    } else {
+      $("onlineSheet").hidden = true;
+      if (online.seat !== null) watchPresence();
+    }
+
+    if (g.status === "over" && online.lastStatus !== "over") {
+      const live = online.lastStatus === "playing";
+      if (live && meWonOnline()) confetti();
+      clearTimeout(state.timer);
+      state.timer = setTimeout(showOnlineResult, live ? (state.line ? 1100 : 500) : 0);
+    }
+    if (g.status === "over" && g.rematch && g.rematch !== online.rematchMine && online.seat !== null && online.rematchSeen !== g.rematch) {
+      online.rematchSeen = g.rematch;
+      toast(`${onlineNames()[1]} wants a rematch`);
+      $("againBtn").textContent = "Accept rematch";
+    }
+    online.lastStatus = g.status;
+    render();
+  }
+  const meWonOnline = () => online.seat !== null && state.winner === 0;
+
+  async function watchGame(id) {
+    await fbInit();
+    stopWatching();
+    clearTimeout(state.timer);
+    Object.assign(online, { id, g: null, lastStatus: null, claimed: null, oppOnline: null, live: false });
+    history.replaceState(null, "", `?g=${id}`);
+    $("resultSheet").hidden = true;
+    render();
+    online.unsub.push(fb.onValue(gameRef(id), s => applyGame(s.val()),
+      () => showOnlineMsg("📡", "Couldn't load the game", "Check your connection and try again.")));
+  }
+
+  function stopWatching() {
+    online.unsub.forEach(u => u());
+    online.unsub = [];
+    if (online.presence) { fb.set(online.presence, false).catch(() => {}); online.presence = null; }
+  }
+
+  function watchPresence() {
+    if (online.presence) return;
+    const mine = fb.ref(fb.db, `presence/${online.id}/${online.seat}`);
+    online.presence = mine;
+    online.unsub.push(fb.onValue(fb.ref(fb.db, ".info/connected"), s => {
+      if (!s.val()) return;
+      fb.onDisconnect(mine).set(false);
+      fb.set(mine, true).catch(() => {});
+    }));
+    online.unsub.push(fb.onValue(fb.ref(fb.db, `presence/${online.id}/${1 - online.seat}`), s => {
+      online.oppOnline = s.val();
+      render();
+    }));
+  }
+
+  async function createGame(starter, name) {
+    name = (name || "").trim().slice(0, 20);
+    if (name) saveName(name);
+    try {
+      await fbInit();
+      const id = newId();
+      const g = { host: fb.uid, base: online.tc.base, inc: online.tc.inc, starter,
+        createdAt: fb.serverTimestamp(), status: "waiting", h0: "", h1: "" };
+      if (name) g.hostName = name;
+      await fb.set(gameRef(id), g);
+      return id;
+    } catch {
+      toast("Couldn't create the game — check your connection");
+      return null;
+    }
+  }
+
+  async function acceptChallenge() {
+    const g = online.g;
+    if (!g || g.status !== "waiting") return;
+    const name = ($("olName2").value || savedName()).trim().slice(0, 20);
+    if (name) saveName(name);
+    const u = { guest: fb.uid, status: "playing", turn: g.starter, turnAt: fb.serverTimestamp(), owe: -1,
+      b0: g.base + (g.starter === 0 ? COUNTDOWN : 0), b1: g.base + (g.starter === 1 ? COUNTDOWN : 0) };
+    if (name) u.guestName = name;
+    $("olAccept").disabled = true;
+    try { await fb.update(gameRef(online.id), u); }
+    catch { showOnlineMsg("😬", "Too late", "Someone else already accepted this challenge."); }
+    finally { $("olAccept").disabled = false; }
+  }
+
+  function onlineMove(n) {
+    const g = online.g, p = online.seat;
+    if (!canMoveOnline() || owner(n) !== null) return;
+    const q = 1 - p, h = g["h" + p] + n;
+    const u = { last: String(n), ["h" + p]: h, turnAt: fb.serverTimestamp(), prevAt: g.turnAt, owe: p, turn: q };
+    if (g.owe === q) u["b" + q] = g["b" + q] - (g.turnAt - g.prevAt) + g.inc;
+    if (findLine(digits(h))) Object.assign(u, { status: "over", winner: p, reason: "line" });
+    else if (h.length + g["h" + q].length === 9) Object.assign(u, { status: "over", winner: -1, reason: "draw" });
+    online.pending = true;
+    fb.update(gameRef(online.id), u)
+      .catch(() => toast("Move rejected — your time ran out"))
+      .finally(() => { online.pending = false; render(); });
+  }
+
+  function resign() {
+    const b = $("newBtn");
+    if (!b.dataset.confirm) {
+      b.dataset.confirm = "1";
+      b.textContent = "Tap again to resign";
+      setTimeout(() => { delete b.dataset.confirm; render(); }, 2500);
+      return;
+    }
+    delete b.dataset.confirm;
+    fb.update(gameRef(online.id), { status: "over", winner: 1 - online.seat, reason: "resign" }).catch(() => {});
+  }
+
+  async function rematch() {
+    const g = online.g, old = online.id;
+    if (g.rematch && g.rematch !== online.rematchMine) { online.autoJoin = true; return watchGame(g.rematch); }
+    if (online.rematchMine && g.rematch === online.rematchMine) return watchGame(online.rematchMine);
+    online.tc = { base: g.base, inc: g.inc };
+    const starter = online.seat === g.starter ? 1 : 0; // whoever didn't start last time goes first
+    const id = await createGame(starter, online.seat === 0 ? g.hostName : g.guestName);
+    if (!id) return;
+    online.rematchMine = id;
+    try { await fb.update(gameRef(old), { rematch: id }); }
+    catch { // they asked at the same moment: join theirs instead
+      const theirs = (await fb.get(gameRef(old))).val()?.rematch;
+      if (theirs) { online.autoJoin = true; return watchGame(theirs); }
+    }
+    watchGame(id);
+  }
+
+  function showOnlineResult() {
+    const g = online.g, [, opp] = names(), spectator = online.seat === null;
+    let emoji = "🏆", title, text = "";
+    if (state.winner === null) { emoji = "🤝"; title = "Draw"; text = "All nine cards gone, no 15."; }
+    else if (spectator) {
+      title = `${names()[state.winner]} wins`;
+      text = { time: "Won on time.", resign: "Won by resignation.", line: "" }[g.reason];
+    } else if (state.winner === 0) {
+      title = "You win!";
+      text = { time: `${opp} ran out of time.`, resign: `${opp} resigned.`, line: `Beat ${opp} in a live game.` }[g.reason];
+    } else {
+      emoji = g.reason === "time" ? "⏱" : "😤"; title = `${opp} wins`;
+      text = { time: "You ran out of time.", resign: "You resigned.", line: `${opp} found 15 first.` }[g.reason];
+    }
+    $("resEmoji").textContent = emoji;
+    $("resTitle").textContent = title;
+    $("resText").textContent = text;
+    $("resEq").innerHTML = state.line
+      ? state.line.map(n => `<span class="chip">${n}</span>`).join("<span>+</span>") + `<span>=</span><span class="chip total">15</span>`
+      : "";
+    $("resStats").hidden = true;
+    $("againBtn").textContent = spectator ? "Play vs AI" : g.rematch && g.rematch !== online.rematchMine ? "Accept rematch" : "Rematch";
+    $("onlineSheet").hidden = true;
+    $("resultSheet").hidden = false;
+  }
+
+  function showSheetPart(part) {
+    for (const id of ["olCreate", "olWaiting", "olInvite", "olMsg"]) $(id).hidden = id !== part;
+    $("resultSheet").hidden = true;
+    $("helpSheet").hidden = true;
+    $("onlineSheet").hidden = false;
+  }
+  function showCreate() {
+    $("olName").value = $("olName").value || savedName();
+    showSheetPart("olCreate");
+  }
+  function showWaiting() {
+    $("olLink").value = gameUrl(online.id);
+    $("olWaitTitle").textContent = online.rematchMine === online.id ? "Rematch sent" : "Send this link";
+    showSheetPart("olWaiting");
+  }
+  function showInvite(g) {
+    const host = g.hostName || "Someone";
+    $("olInviteTitle").textContent = `${host} challenged you`;
+    $("olInviteText").textContent = `A live game of The 15-Game, ${tcLabel(g)} per player. Hold three numbers that add up to 15 to win. ${g.starter === 0 ? `${host} moves first.` : "You move first."}`;
+    $("olName2").value = savedName();
+    showSheetPart("olInvite");
+  }
+  function showOnlineMsg(emoji, title, text) {
+    $("olMsgEmoji").textContent = emoji;
+    $("olMsgTitle").textContent = title;
+    $("olMsgText").textContent = text;
+    showSheetPart("olMsg");
+  }
+  const challengeText = () => {
+    const g = online.g;
+    return `⚔️ ${g && g.hostName ? g.hostName + " challenged" : "I'm challenging"} you to a live game of The 15-Game (${g ? tcLabel(g) : ""} per player). First to hold three numbers that add up to 15 wins.\n${gameUrl(online.id)}`;
+  };
+
+  function leaveOnline() {
+    stopWatching();
+    clearTimeout(state.timer);
+    Object.assign(online, { id: null, g: null, seat: null, oppOnline: null });
+    history.replaceState(null, "", location.pathname);
+    $("onlineSheet").hidden = true;
+    $("countdown").hidden = true;
+  }
+
+  // Clocks, the 3-2-1 countdown, and claiming a fallen flag.
+  setInterval(() => {
+    const g = online.g, show = state.mode === "online" && !!g && g.status !== "waiting";
+    $("clock0").hidden = $("clock1").hidden = !show;
+    const cd = $("countdown");
+    if (!show) { cd.hidden = true; return; }
+    const now = fb.now(), me = online.seat ?? 0;
+    [me, 1 - me].forEach((seat, panel) => {
+      const ms = clockMs(g, seat, now), el = $("clock" + panel);
+      el.textContent = fmtClock(ms);
+      el.classList.toggle("low", g.status === "playing" && g.turn === seat && ms < 5000);
+    });
+    const counting = inCountdown();
+    cd.hidden = !counting;
+    if (counting) {
+      const n = String(Math.min(3, Math.ceil((g.turnAt + COUNTDOWN - now) / 1000)));
+      if (cd.textContent !== n) cd.innerHTML = `<span>${n}</span>`;
+    }
+    if (counting === online.live) { online.live = !counting; render(); }
+    // The rules only accept this once the server agrees the time is up.
+    if (g.status === "playing" && online.seat !== null && online.claimed !== g.turnAt
+        && clockMs(g, g.turn, now) < -(GRACE + 250)) {
+      online.claimed = g.turnAt;
+      fb.update(gameRef(online.id), { status: "over", winner: 1 - g.turn, reason: "time" })
+        .catch(() => setTimeout(() => { online.claimed = null; }, 1000));
+    }
+  }, 100);
+
   // ---------- Wiring ----------
-  $("newBtn").onclick = newGame;
-  $("againBtn").onclick = newGame;
-  $("shareBtn").onclick = share;
+  $("newBtn").onclick = () => {
+    if (state.mode !== "online") return newGame();
+    const g = online.g, player = g && online.seat !== null;
+    if (player && g.status === "waiting" && online.seat === 0) return showWaiting();
+    if (player && g.status === "playing") return resign();
+    if (player && g.status === "over") return rematch();
+    showCreate();
+  };
+  $("againBtn").onclick = () => {
+    if (state.mode !== "online") return newGame();
+    $("resultSheet").hidden = true;
+    if (online.seat === null) return $("modeSeg").querySelector('[data-mode="ai"]').click();
+    rematch();
+  };
+  $("shareBtn").onclick = () => share();
   $("hints").onchange = e => { state.hints = e.target.checked; render(); };
   document.querySelectorAll("#diffSeg button").forEach(b => b.onclick = () => {
     state.diff = b.dataset.diff; state.nextStarter = 0; newGame();
   });
   document.querySelectorAll("#modeSeg button").forEach(b => b.onclick = () => {
-    state.mode = b.dataset.mode; state.nextStarter = 0; newGame();
+    const mode = b.dataset.mode;
+    if (mode === state.mode && mode === "online") return online.id ? null : showCreate();
+    if (state.mode === "online") leaveOnline();
+    state.mode = mode;
+    state.nextStarter = 0;
+    if (mode !== "online") return newGame();
+    clearTimeout(state.timer);
+    Object.assign(state, { hands: [[], []], turn: 0, over: false, thinking: false, winner: null, line: null, hints: false });
+    $("hints").checked = false;
+    $("resultSheet").hidden = true;
+    render();
+    showCreate();
   });
+  document.querySelectorAll("#tcSeg button").forEach(b => b.onclick = () => {
+    online.tc = { base: +b.dataset.base, inc: +b.dataset.inc };
+    document.querySelectorAll("#tcSeg button").forEach(x => x.setAttribute("aria-pressed", x === b));
+  });
+  $("olCreateBtn").onclick = async () => {
+    $("olCreateBtn").disabled = true;
+    if (online.id) leaveOnline();
+    online.rematchMine = null;
+    const id = await createGame(Math.random() < .5 ? 0 : 1, $("olName").value);
+    $("olCreateBtn").disabled = false;
+    if (id) watchGame(id);
+  };
+  $("olAccept").onclick = acceptChallenge;
+  $("olShare").onclick = () => share(challengeText());
+  $("olCopy").onclick = () => navigator.clipboard.writeText(gameUrl(online.id)).then(() => toast("Link copied"), () => $("olLink").select());
+  $("olMsgAi").onclick = () => $("modeSeg").querySelector('[data-mode="ai"]').click();
+  $("olMsgNew").onclick = () => { leaveOnline(); render(); showCreate(); };
   $("helpBtn").onclick = () => { $("helpSheet").hidden = false; $("helpClose").focus(); };
   $("helpClose").onclick = () => { $("helpSheet").hidden = true; };
-  for (const id of ["helpSheet", "resultSheet"]) {
+  const SHEETS = ["helpSheet", "resultSheet", "onlineSheet"];
+  for (const id of SHEETS) {
     $(id).addEventListener("click", e => { if (e.target.id === id) $(id).hidden = true; });
   }
   document.addEventListener("keydown", e => {
-    if (e.key === "Escape") { $("helpSheet").hidden = true; $("resultSheet").hidden = true; return; }
-    if (/^[1-9]$/.test(e.key) && $("helpSheet").hidden && $("resultSheet").hidden) humanPick(+e.key);
+    if (e.key === "Escape") { SHEETS.forEach(id => { $(id).hidden = true; }); return; }
+    if (e.target.tagName === "INPUT") return;
+    if (/^[1-9]$/.test(e.key) && SHEETS.every(id => $(id).hidden)) humanPick(+e.key);
   });
 
-  // First visit: show the rules once.
-  try { if (!localStorage.getItem("pick15-seen")) { $("helpSheet").hidden = false; localStorage.setItem("pick15-seen", "1"); } } catch {}
-
-  newGame();
+  const linkedGame = new URLSearchParams(location.search).get("g");
+  if (linkedGame && /^[a-z0-9]{8}$/.test(linkedGame)) {
+    state.mode = "online";
+    render();
+    watchGame(linkedGame).catch(() => showOnlineMsg("📡", "Couldn't connect", "Check your connection and reload."));
+  } else {
+    // First visit: show the rules once.
+    try { if (!localStorage.getItem("pick15-seen")) { $("helpSheet").hidden = false; localStorage.setItem("pick15-seen", "1"); } } catch {}
+    newGame();
+  }
 </script>
 </body>
 </html>

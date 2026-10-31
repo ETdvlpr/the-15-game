@@ -1,1 +1,9 @@
 .vercel
+.firebase/
+*-debug.log
+node_modules/
+.env*
+*service-account*.json
+*.pem
+*.key
+.DS_Store
